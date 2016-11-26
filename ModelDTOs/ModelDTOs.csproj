@@ -44,8 +44,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AuthData.cs" />
+    <Compile Include="Entities\BaseEntityType.cs" />
+    <Compile Include="Entities\EntityDTO.cs" />
+    <Compile Include="Entities\ResourceProviderDTO.cs" />
+    <Compile Include="Entities\UnitDTO.cs" />
+    <Compile Include="PlayerDTO.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Resources\ResourceDTO.cs" />
+    <Compile Include="Resources\ResourceSetDTO.cs" />
+    <Compile Include="Resources\ResourceType.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

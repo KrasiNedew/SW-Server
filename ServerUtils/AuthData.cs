@@ -1,4 +1,4 @@
-﻿namespace ModelDTOs
+﻿namespace ServerUtils
 {
     using System.Text;
 
@@ -14,7 +14,7 @@
 
         public string PasswordHash { get; set; }
 
-        private static string GenerateHash(string password)
+        public static string GenerateHash(string password)
         {
             System.Security.Cryptography.SHA256Managed crypt = new System.Security.Cryptography.SHA256Managed();
             System.Text.StringBuilder hash = new System.Text.StringBuilder();

@@ -5,6 +5,8 @@
 
     using ModelDTOs;
 
+    using ServerUtils;
+
     public class ConnectedClient
     {
         public Socket Socket { get; }

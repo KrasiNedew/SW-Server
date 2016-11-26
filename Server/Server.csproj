@@ -45,6 +45,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AsynchronousSocketListener.cs" />
+    <Compile Include="Handlers\ErrorCodes.cs" />
+    <Compile Include="Handlers\Messages.cs" />
+    <Compile Include="Handlers\RequestHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ServerManager.cs" />
     <Compile Include="StateObject.cs" />
@@ -56,13 +59,21 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Data\Data.csproj">
+      <Project>{ab267d65-f417-4ba3-82d4-986795cd922b}</Project>
+      <Name>Data</Name>
+    </ProjectReference>
     <ProjectReference Include="..\ModelDTOs\ModelDTOs.csproj">
       <Project>{07FF5720-B271-4555-880B-BFBB77424F41}</Project>
       <Name>ModelDTOs</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Serializer\Serializer.csproj">
-      <Project>{3485EFEF-7F96-4AE1-9D51-64DB0C1502DE}</Project>
-      <Name>Serializer</Name>
+    <ProjectReference Include="..\Serialization\Serialization.csproj">
+      <Project>{5599f484-ea65-47e0-8846-b9e1144817e9}</Project>
+      <Name>Serialization</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\ServerUtils\ServerUtils.csproj">
+      <Project>{5b099471-2568-4e7c-a47d-f963229db4df}</Project>
+      <Name>ServerUtils</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

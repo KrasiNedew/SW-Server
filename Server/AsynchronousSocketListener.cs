@@ -14,9 +14,12 @@
 
     using Newtonsoft.Json;
 
-    using Serializer;
+    using Serialization;
 
+    using Server.Handlers;
     using Server.Wrappers;
+
+    using ServerUtils;
 
     public class AsynchronousSocketListener
     {
@@ -91,25 +94,20 @@
                     Packet received = new Packet(client.PacketAssembler.DataBuffer);
                     client.PacketAssembler.Packets.Add(received);
 
-                    client.PacketAssembler.DataBuffer = new byte[Packet.Size];
+                    client.PacketAssembler.CleanDataBuffer();
 
                     if (received.GetStringFromRawData().EndsWith("<EOF>"))
                     {
-                        string data = client.PacketAssembler.CurrentStringData;
+                        string data = client.PacketAssembler.ReceivedStringData;
 
                         // clean the packet assembler
-                        client.PacketAssembler.DataBuffer = new byte[Packet.Size];
-                        client.PacketAssembler.Packets = new List<Packet>();
+                        client.PacketAssembler.CleanDataBuffer();
+                        client.PacketAssembler.CleanPackets();
 
-                        // get auth info out of the data
-                        client.AuthData = Serializer.ExtractUsernameAndPassword(data);
+                        ServiceRequest request = Deserializer.ExtractServiceRequest(data);
+                        this.ParseRequest(client, request, data);
 
-                        // check if client credentials are correct and 
-                        // mark if tey are
-                        // remeber to set to false after first response sent back
-                        client.Validated = true;
-
-                        // parse the data
+                        // log the data
                         Console.WriteLine(JsonConvert.DeserializeObject(data));
                     }
                 }
@@ -118,7 +116,11 @@
             }
             catch (Exception e)
             {
-                this.clients.Remove(client);
+                if (client != null)
+                {
+                    this.SendToThenDropConnection(client, Messages.InternalErrorDrop);
+                }
+
                 Console.WriteLine(e.ToString());
             }         
         }
@@ -146,10 +148,10 @@
         {
             try
             {
-                //if (!client.Validated)
-                //{
-                //    throw new InvalidOperationException("Cannot send data to non validated clients");
-                //}
+                if (!client.Validated)
+                {
+                    throw new InvalidOperationException("Cannot send data to non validated clients");
+                }
 
                 byte[] dataBytes = Encoding.ASCII.GetBytes(data);
 
@@ -161,6 +163,17 @@
             }
         }
 
+        private void SendToThenDropConnection(ConnectedClient client, string data)
+        {
+            byte[] dataBytes = Encoding.ASCII.GetBytes(data);
+
+            client.Socket.Send(dataBytes);
+
+            client.Close();
+            this.clients.Remove(client);
+            client = null;
+        }
+
         private void SendToCallback(IAsyncResult result)
         {
             ConnectedClient client = (ConnectedClient)result;
@@ -168,6 +181,96 @@
             int bytesSent = client.Socket.EndSend(result);
 
             Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, client.AuthData.Username);
+        }
+
+        private bool ParseRequest(ConnectedClient client, ServiceRequest request, string data)
+        {
+            int err;
+            switch (request)
+            {
+                case ServiceRequest.Unknown:
+                    this.SendToThenDropConnection(client, "Invalid request");
+                    return false;
+                case ServiceRequest.Login:
+                    err = RequestHandler.Login(client, data);
+
+                    switch (err)
+                    {
+                        case ErrorCodes.InvalidCredentialsError:
+                            this.SendTo(client, Messages.InvalidCredentials);
+                            break;
+                        case ErrorCodes.InternalError:
+                            this.SendTo(
+                                client, Messages.SomethingWentWrong);
+                            break;
+                        default:
+                            this.SendToThenDropConnection(
+                                client, Messages.InternalErrorDrop);
+                            return false;
+                    }
+
+                    break;
+
+                case ServiceRequest.Logout:
+                    // change state to logged out
+                    err = RequestHandler.Logout(client);
+                    switch (err)
+                    {
+                        case 0:
+                            this.SendToThenDropConnection(client, Messages.LogoutSuccess);
+                            break;
+                        case ErrorCodes.LogoutError:
+                            this.SendTo(client, Messages.DataNotSaved);
+                            break;
+                        default:
+                            this.SendToThenDropConnection(
+                                client, Messages.InternalErrorDrop);
+                            return false;
+                    }
+
+                    break;
+
+                case ServiceRequest.Registration:
+                    err = RequestHandler.Register(client, data);
+
+                    switch (err)
+                    {
+                        case 0:
+                            this.SendTo(
+                            client,
+                            Messages.RegisterSuccessful);
+                            break;
+                        case ErrorCodes.AlreadyLoggedIn:
+                            this.SendTo(
+                            client,
+                            Messages.AlreadyLoggedIn);
+                            break;
+                        case ErrorCodes.UsernameEmptyError:
+                            this.SendTo(
+                            client,
+                            Messages.EmptyUsername);
+                            break;
+                        case ErrorCodes.PasswordEmptyError:
+                            this.SendTo(
+                            client,
+                            Messages.EmptyPassword);
+                            break;
+                        case ErrorCodes.UsernameTakenError:
+                            this.SendTo(
+                            client,
+                            Messages.UsernameTaken);
+                            break;
+                        default:
+                            this.SendToThenDropConnection(
+                            client,
+                            Messages.InternalErrorDrop);
+                            return false;
+                    }
+
+                    break;
+            }
+
+            return true;
         }
 
         private static IPAddress GetLocalIPAddress()

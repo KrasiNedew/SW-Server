@@ -11,11 +11,11 @@
             this.DataBuffer = new byte[Packet.Size];
         }
 
-        public byte[] DataBuffer { get; set; }
+        public byte[] DataBuffer { get; private set; }
 
-        public List<Packet> Packets { get; set; }
+        public List<Packet> Packets { get; private set; }
 
-        public byte[] CurrentRawData
+        public byte[] ReceivedRawData
         {
             get
             {
@@ -23,7 +23,7 @@
             }
         }
 
-        public string CurrentStringData
+        public string ReceivedStringData
         {
             get
             {
@@ -31,6 +31,16 @@
 
                 return val.EndsWith("<EOF>") ? val.Remove(val.Length - 5) : val;
             }
+        }
+
+        public void CleanDataBuffer()
+        {
+            this.DataBuffer = new byte[Packet.Size];
+        }
+
+        public void CleanPackets()
+        {
+            this.Packets = new List<Packet>();
         }
     }
 }
