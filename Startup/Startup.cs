@@ -6,7 +6,7 @@
     {
         static void Main()
         {
-            ServerManager.Instance.StartServer();
+            ServerManager.Instance.StartServer(3000);
         }
     }
 }

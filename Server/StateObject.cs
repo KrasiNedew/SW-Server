@@ -8,11 +8,11 @@
         // Size of receive Buffer.
         public const int BufferSize = 1024;
 
-        // Client  socket.
+        // Socket  socket.
         public Socket WorkSocket = null;
         // Receive Buffer.
         public byte[] Buffer = new byte[BufferSize];
-        // Received data string.
+        // Packets data string.
         public StringBuilder Sb = new StringBuilder();
     }
 }

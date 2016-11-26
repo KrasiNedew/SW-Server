@@ -1,142 +1,187 @@
 ﻿namespace Server
 {
     using System;
+    using System.Collections;
+    using System.Collections.Generic;
+    using System.Linq;
     using System.Net;
     using System.Net.Sockets;
     using System.Text;
     using System.Threading;
+    using System.Threading.Tasks;
+
+    using ModelDTOs;
+
+    using Newtonsoft.Json;
+
+    using Serializer;
+
+    using Server.Wrappers;
 
     public class AsynchronousSocketListener
     {
         // Thread signal.
-        public ManualResetEvent AllDone = new ManualResetEvent(false);
+        private readonly ManualResetEvent allDone;
+
+        private HashSet<ConnectedClient> clients { get; set; }
+
+        private Socket listener;
 
         public AsynchronousSocketListener()
         {
+            this.allDone = new ManualResetEvent(false);
+            this.clients = new HashSet<ConnectedClient>();
+            this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         }
 
-        public void StartListening()
+        public void StartListening(int port)
         {
-            IPHostEntry ipHostInfo = Dns.Resolve(Dns.GetHostName());
-            IPAddress ipAddress = ipHostInfo.AddressList[0];
-            IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 11000);
+            IPEndPoint endPoint = new IPEndPoint(GetLocalIPAddress(), port);
+            this.listener.Bind(endPoint);
 
-            // Create a TCP/IP socket.
-            Socket listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            this.listener.Listen(0);
 
-            // Bind the socket to the local endpoint and listen for incoming connections.
+            Console.WriteLine("Server listening on " + endPoint.Address);
+
+            while (true)
+            {
+                this.allDone.Reset();
+                //this.clients.RemoveWhere(client => !client.Socket.Connected);
+
+                try
+                {
+                    this.listener.BeginAccept(this.AcceptCallback, null);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.ToString());
+                }
+
+                this.allDone.WaitOne();
+            }
+        }
+
+        private void AcceptCallback(IAsyncResult result)
+        {
+            Socket socket = this.listener.EndAccept(result);
+            this.allDone.Set();
+
+            if (socket == null)
+            {
+                throw new Exception("Socket was null wtf?");
+            }
+
+            ConnectedClient client = new ConnectedClient(socket);
+
+            this.clients.Add(client);
+
+            this.BeginReceive(client);
+        }
+
+        private void ReceiveCallback(IAsyncResult result)
+        {
+            ConnectedClient client = result.AsyncState as ConnectedClient;
+
             try
             {
-                listener.Bind(localEndPoint);
-                listener.Listen(100);
+                int bytesReceived = client.Socket.EndReceive(result);
 
-                while (true)
+                if (bytesReceived > 0)
                 {
-                    // Set the event to nonsignaled state.
-                    this.AllDone.Reset();
+                    Packet received = new Packet(client.PacketAssembler.DataBuffer);
+                    client.PacketAssembler.Packets.Add(received);
 
-                    // Start an asynchronous socket to listen for connections.
-                    Console.WriteLine("Waiting for a connection...");
-                    listener.BeginAccept(new AsyncCallback(AcceptCallback), listener);
+                    client.PacketAssembler.DataBuffer = new byte[Packet.Size];
 
-                    // Wait until a connection is made before continuing.
-                    this.AllDone.WaitOne();
+                    if (received.GetStringFromRawData().EndsWith("<EOF>"))
+                    {
+                        string data = client.PacketAssembler.CurrentStringData;
+
+                        // clean the packet assembler
+                        client.PacketAssembler.DataBuffer = new byte[Packet.Size];
+                        client.PacketAssembler.Packets = new List<Packet>();
+
+                        // get auth info out of the data
+                        client.AuthData = Serializer.ExtractUsernameAndPassword(data);
+
+                        // check if client credentials are correct and 
+                        // mark if tey are
+                        // remeber to set to false after first response sent back
+                        client.Validated = true;
+
+                        // parse the data
+                        Console.WriteLine(JsonConvert.DeserializeObject(data));
+                    }
                 }
+
+                this.BeginReceive(client);
+            }
+            catch (Exception e)
+            {
+                this.clients.Remove(client);
+                Console.WriteLine(e.ToString());
+            }         
+        }
+
+        private void BeginReceive(ConnectedClient client)
+        {
+            client.Socket.BeginReceive(
+                        client.PacketAssembler.DataBuffer,
+                        0,
+                        Packet.Size,
+                        SocketFlags.None,
+                        this.ReceiveCallback,
+                        client);
+        }
+
+        private void Broadcast(string data)
+        {
+            foreach (var client in this.clients)
+            {
+                this.SendTo(client, data);
+            }
+        }
+
+        private void SendTo(ConnectedClient client, string data)
+        {
+            try
+            {
+                //if (!client.Validated)
+                //{
+                //    throw new InvalidOperationException("Cannot send data to non validated clients");
+                //}
+
+                byte[] dataBytes = Encoding.ASCII.GetBytes(data);
+
+                client.Socket.BeginSend(dataBytes, 0, dataBytes.Length, SocketFlags.None, this.SendToCallback, client);
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
             }
-
-            Console.WriteLine("\nPress ENTER to continue...");
-            Console.Read();
         }
 
-        public void AcceptCallback(IAsyncResult ar)
+        private void SendToCallback(IAsyncResult result)
         {
-            // Signal the main thread to continue.
-            this.AllDone.Set();
+            ConnectedClient client = (ConnectedClient)result;
 
-            // Get the socket that handles the client request.
-            Socket listener = (Socket)ar.AsyncState;
-            Socket handler = listener.EndAccept(ar);
+            int bytesSent = client.Socket.EndSend(result);
 
-            // Create the state object.
-            StateObject state = new StateObject();
-            state.WorkSocket = handler;
-            handler.BeginReceive(state.Buffer, 0, StateObject.BufferSize, 0, new AsyncCallback(ReadCallback), state);
+            Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, client.AuthData.Username);
         }
 
-        public void ReadCallback(IAsyncResult ar)
+        private static IPAddress GetLocalIPAddress()
         {
-            String content = String.Empty;
-
-            // Retrieve the state object and the handler socket
-            // from the asynchronous state object.
-            StateObject state = (StateObject)ar.AsyncState;
-            Socket handler = state.WorkSocket;
-
-            // Read data from the client socket. 
-            int bytesRead = handler.EndReceive(ar);
-
-            if (bytesRead > 0)
+            var host = Dns.GetHostEntry(Dns.GetHostName());
+            foreach (var ip in host.AddressList)
             {
-                // There  might be more data, so store the data received so far.
-                state.Sb.Append(Encoding.ASCII.GetString(state.Buffer, 0, bytesRead));
-
-                // Check for end-of-file tag. If it is not there, read 
-                // more data.
-                content = state.Sb.ToString();
-                if (content.IndexOf("<EOF>") > -1)
+                if (ip.AddressFamily == AddressFamily.InterNetwork)
                 {
-                    // All the data has been read from the 
-                    // client. Display it on the console.
-                    Console.WriteLine("Read {0} bytes from socket. \n Data : {1}", content.Length, content);
-                    // Echo the data back to the client.
-                    Send(handler, content);
-                }
-                else
-                {
-                    // Not all data received. Get more.
-                    handler.BeginReceive(
-                        state.Buffer,
-                        0,
-                        StateObject.BufferSize,
-                        0,
-                        new AsyncCallback(ReadCallback),
-                        state);
+                    return ip;
                 }
             }
-        }
 
-        private void Send(Socket handler, String data)
-        {
-            // Convert the string data to byte data using ASCII encoding.
-            byte[] byteData = Encoding.ASCII.GetBytes(data);
-
-            // Begin sending the data to the remote device.
-            handler.BeginSend(byteData, 0, byteData.Length, 0, new AsyncCallback(SendCallback), handler);
-        }
-
-        private void SendCallback(IAsyncResult ar)
-        {
-            try
-            {
-                // Retrieve the socket from the state object.
-                Socket handler = (Socket)ar.AsyncState;
-
-                // Complete sending the data to the remote device.
-                int bytesSent = handler.EndSend(ar);
-                Console.WriteLine("Sent {0} bytes to client.", bytesSent);
-
-                handler.Shutdown(SocketShutdown.Both);
-                handler.Close();
-
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.ToString());
-            }
+            return IPAddress.Parse("127.0.0.1");
         }
     }
 }

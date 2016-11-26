@@ -15,9 +15,9 @@
         public static ServerManager Instance => instance ?? (instance = new ServerManager(new AsynchronousSocketListener()));
 
 
-        public void StartServer()
+        public void StartServer(int port)
         {
-            this.Listener.StartListening();
+            this.Listener.StartListening(port);
         }
     }
 }
