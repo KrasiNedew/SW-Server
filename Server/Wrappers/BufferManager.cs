@@ -8,54 +8,100 @@
 
     public static class BufferManager
     {
-        public const int NumberOfBuffers = 10000;
+        public const int NumberOfDataBuffers = 10000;
 
-        private static BlockingCollection<byte[]> Clearance;
+        public const int NumberOfTransferBuffers = 5000;
 
-        public static Stack<byte[]> Buffers;
+        private static BlockingCollection<byte[]> DataBufferClearance;
+
+        private static BlockingCollection<byte[]> TransferBufferClearance;
+
+        // public so I can keep track of them while debugging
+        public static Stack<byte[]> DataBuffers;
+
+        public static Stack<byte[]> TransferBuffers; 
 
         public static void Init()
         {
-            Buffers = new Stack<byte[]>(NumberOfBuffers);
-            Clearance = new BlockingCollection<byte[]>(NumberOfBuffers);
+            DataBuffers = new Stack<byte[]>(NumberOfDataBuffers);
+            TransferBuffers = new Stack<byte[]>(NumberOfTransferBuffers);
+            DataBufferClearance = new BlockingCollection<byte[]>(NumberOfDataBuffers);
+            TransferBufferClearance = new BlockingCollection<byte[]>(NumberOfTransferBuffers);
 
-            for (int i = 0; i < NumberOfBuffers; i++)
+            for (int i = 0; i < NumberOfDataBuffers; i++)
             {
-                Buffers.Push(new byte[PacketAssembler.PacketSize]);
+                DataBuffers.Push(new byte[PacketAssembler.PacketSize]);
             }
 
-            Task.Run(() => { CleanPending(); });
+            for (int i = 0; i < NumberOfTransferBuffers; i++)
+            {
+                TransferBuffers.Push(new byte[PacketAssembler.PacketSize * 2]);
+            }
+
+            Task.Run(() => { CleanDataBuffers(); });
+            Task.Run(() => { CleanTransferBuffers(); });
         }
 
-        public static void TakeBack(byte[] buffer)
+        public static void TakeDataBufferBack(byte[] buffer)
         {
-            Clearance.Add(buffer);
+            DataBufferClearance.Add(buffer);
         }
 
-        public static byte[] Give()
+        public static byte[] GiveDataBuffer()
         {
-            return Buffers.Pop();
+            return DataBuffers.Pop();
         }
 
-        private static void CleanPending()
+        public static void TakeTransferBufferBack(byte[] buffer)
+        {
+            TransferBufferClearance.Add(buffer);
+        }
+
+        public static byte[] GiveTransferBuffer()
+        {
+            return TransferBuffers.Pop();
+        }
+
+        private static void CleanDataBuffers()
         {
             bool available;
             do
             {
                 byte[] buffer;
-                available = Clearance.TryTake(out buffer, Timeout.Infinite);
+                available = DataBufferClearance.TryTake(out buffer, Timeout.Infinite);
                 if (available)
                 {
-                    CleanBuffer(buffer);
+                    CleanDataBuffer(buffer);
                 }
             }
             while (available);
         }
 
-        private static void CleanBuffer(byte[] buffer)
+        private static void CleanTransferBuffers()
+        {
+            bool available;
+            do
+            {
+                byte[] buffer;
+                available = TransferBufferClearance.TryTake(out buffer, Timeout.Infinite);
+                if (available)
+                {
+                    CleanTransferBuffer(buffer);
+                }
+            }
+            while (available);
+        }
+
+        private static void CleanDataBuffer(byte[] buffer)
         {
             Array.Clear(buffer, 0, PacketAssembler.PacketSize);
-            Buffers.Push(buffer);
+            DataBuffers.Push(buffer);
+        }
+
+        private static void CleanTransferBuffer(byte[] buffer)
+        {
+            Array.Clear(buffer, 0, PacketAssembler.PacketSize);
+            TransferBuffers.Push(buffer);
         }
     }
 }

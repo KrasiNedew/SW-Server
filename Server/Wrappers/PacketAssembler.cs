@@ -8,7 +8,7 @@
 
         public PacketAssembler()
         {
-            this.DataBuffer = BufferManager.Give();
+            this.DataBuffer = BufferManager.GiveDataBuffer();
             this.Data = new byte[PacketSize * 2];
         }
 
@@ -27,10 +27,10 @@
 
             // Pushes the buffer on the blocking queue to be cleaned on background thread.
             // No time overhead.
-            BufferManager.TakeBack(temp);
+            BufferManager.TakeDataBufferBack(temp);
 
             // Take clean buffer immediately
-            this.DataBuffer = BufferManager.Give();
+            this.DataBuffer = BufferManager.GiveDataBuffer();
         }
 
         public void PushReceivedData(int bytesReceived)
@@ -51,22 +51,24 @@
 
         public void AllocateSpace(int bytes)
         {
-            byte[] temp = new byte[this.Data.Length];
+            byte[] temp = BufferManager.GiveTransferBuffer();
             this.Data.CopyTo(temp, 0);
 
             this.Data = new byte[bytes];
 
-            int transfer = Math.Min(temp.Length, this.Data.Length);
-            for (int i = 0; i < transfer; i++)
+            int transferLength = Math.Min(temp.Length, this.Data.Length);
+            for (int i = 0; i < transferLength; i++)
             {
                 this.Data[i] = temp[i];
             }
+
+            BufferManager.TakeTransferBufferBack(temp);
         }
 
         public void Dispose()
         {
             this.Data = null;
-            BufferManager.TakeBack(this.DataBuffer);
+            BufferManager.TakeDataBufferBack(this.DataBuffer);
         }
     }
 }
