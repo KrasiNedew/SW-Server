@@ -1,5 +1,8 @@
 ﻿namespace ModelDTOs.Resources
 {
+    using System.ComponentModel.DataAnnotations;
+    using System.ComponentModel.DataAnnotations.Schema;
+
     using Newtonsoft.Json;
 
     using ProtoBuf;
@@ -23,6 +26,10 @@
             this.Player = associatedPlayer;
         }
 
+        [ProtoMember(7)]
+        [Key, ForeignKey("Player")]
+        public int Id { get; set; }
+
         [ProtoMember(1)]
         public virtual ResourceDTO Gold { get; private set; }
 
@@ -40,9 +47,6 @@
 
         [ProtoMember(6)]
         public virtual ResourceDTO Population { get; private set; }
-
-        [ProtoMember(7)]
-        public int PlayerId { get; private set; }
 
         public virtual PlayerDTO Player { get; private set; }
     }

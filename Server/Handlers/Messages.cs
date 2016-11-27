@@ -2,7 +2,7 @@
 {
     public static class Messages
     {
-        public const string InternalErrorDrop = "Internal Error. Dropping you connection.";
+        public const string InternalErrorDrop = "Internal Error. Dropping you connection";
 
         // #besterrorresponse
         public const string SomethingWentWrong = "Oops something went wrong";

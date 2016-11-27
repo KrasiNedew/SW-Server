@@ -51,6 +51,7 @@
         {
             this.Data = new byte[PacketSize * 2];
             this.BytesRead = 0;
+            this.BytesToRead = 0;
             this.CleanDataBuffer();
         }
 

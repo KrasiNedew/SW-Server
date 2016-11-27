@@ -3,13 +3,13 @@
     using ProtoBuf;
 
     [ProtoContract]
-    public class AuthDataRawDTO
+    public class AuthDataRaw
     {
-        protected AuthDataRawDTO()
+        protected AuthDataRaw()
         {
         }
 
-        public AuthDataRawDTO(string username, string password)
+        public AuthDataRaw(string username, string password)
         {
             this.Username = username;
             this.Password = password;

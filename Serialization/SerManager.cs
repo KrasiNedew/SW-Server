@@ -5,7 +5,7 @@
 
     using ProtoBuf;
 
-    public static class SerializationManager
+    public static class SerManager
     {
         public static byte[] Serialize<T>(T obj)
         {
@@ -28,7 +28,7 @@
             }
         }
 
-        public static int GetLength(byte[] data)
+        public static int GetLengthPrefix(byte[] data)
         {
             if (data.Length < 5)
             {

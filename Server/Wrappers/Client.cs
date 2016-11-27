@@ -1,32 +1,28 @@
 ﻿namespace Server.Wrappers
 {
+    using System;
     using System.Net.Sockets;
-    using System.Text;
-
-    using ModelDTOs;
 
     using ServerUtils;
 
-    public class ConnectedClient
+    public class Client : IDisposable
     {
         public Socket Socket { get; }
 
         public AuthDataSecure AuthData { get; set; }
 
-        public PacketAssembler PacketAssembler { get; set; }
-
         public bool Validated { get; set; }
 
-        public ConnectedClient(Socket socket)
+        public Client(Socket socket)
         {
             this.Socket = socket;
-            this.PacketAssembler = new PacketAssembler();
             this.Validated = false;
         }
 
-        public void Close()
+        public void Dispose()
         {
             this.Socket.Close();
+            this.Socket.Dispose();
         }
     }
 }

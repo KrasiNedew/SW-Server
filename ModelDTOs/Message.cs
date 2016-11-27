@@ -7,7 +7,7 @@
 
     [ProtoContract]
     [ProtoInclude(10, typeof(Message<string>))]
-    [ProtoInclude(20, typeof(Message<AuthDataRawDTO>))]
+    [ProtoInclude(20, typeof(Message<AuthDataRaw>))]
     [ProtoInclude(30, typeof(Message<PlayerDTO>))]
     public abstract class Message
     {

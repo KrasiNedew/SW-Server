@@ -11,6 +11,8 @@
     using System.Threading;
     using System.Threading.Tasks;
 
+    using Data;
+
     using ModelDTOs;
     using ModelDTOs.Enums;
 
@@ -25,19 +27,19 @@
 
     using ServerUtils;
 
-    public class AsynchronousSocketListener
+    public class AsynchronousSocketListener : IDisposable
     {
         // Thread signal.
         private readonly ManualResetEvent allDone;
 
-        private HashSet<ConnectedClient> clients { get; set; }
+        private HashSet<Client> clients { get; set; }
 
-        private Socket listener;
+        private readonly Socket listener;
 
         public AsynchronousSocketListener()
         {
             this.allDone = new ManualResetEvent(false);
-            this.clients = new HashSet<ConnectedClient>();
+            this.clients = new HashSet<Client>();
             this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         }
 
@@ -77,96 +79,110 @@
                 throw new Exception("Socket was null wtf?");
             }
 
-            ConnectedClient client = new ConnectedClient(socket);
+            Client client = new Client(socket);
 
             this.clients.Add(client);
 
-            this.BeginReceive(client);
+            this.BeginReceiveClean(client);
         }
 
         private void ReceiveCallback(IAsyncResult result)
         {
-            ConnectedClient client = result.AsyncState as ConnectedClient;
+            Tuple<Client, PacketAssembler> state =
+                result.AsyncState as Tuple<Client, PacketAssembler>;
+
+            Client client = state?.Item1;
+            PacketAssembler packetAssembler = state?.Item2;
 
             try
             {
                 int bytesReceived = client.Socket.EndReceive(result);
                 bool pushed = false;
 
-                if (client.PacketAssembler.BytesToRead == 0)
+                if (packetAssembler.BytesToRead == 0)
                 {
-                    client.PacketAssembler.PushReceivedData(bytesReceived);
+                    packetAssembler.PushReceivedData(bytesReceived);
                     pushed = true;
 
-                    int streamDataLength = SerializationManager.GetLength(client.PacketAssembler.Data);
+                    int streamDataLength = SerManager.GetLengthPrefix(packetAssembler.Data);
 
                     if (streamDataLength > 0)
                     {
-                        client.PacketAssembler.BytesToRead = streamDataLength;
-                        client.PacketAssembler.AllocateSpace(streamDataLength);
+                        packetAssembler.BytesToRead = streamDataLength;
+                        packetAssembler.AllocateSpace(streamDataLength);
                     }
                 } 
 
-                if (bytesReceived > 0 && client.PacketAssembler.BytesToRead > 0)
+                if (bytesReceived > 0 && packetAssembler.BytesToRead > 0)
                 {
                     if (!pushed)
                     {
-                        client.PacketAssembler.PushReceivedData(bytesReceived);
+                        packetAssembler.PushReceivedData(bytesReceived);
                         pushed = true;
                     }
 
 
-                    if (client.PacketAssembler.BytesRead >= client.PacketAssembler.BytesToRead)
+                    if (packetAssembler.BytesRead >= packetAssembler.BytesToRead)
                     {
                         // handle the client service
                         List<Message> messages =
-                            SerializationManager.DeserializeWithLengthPrefix<List<Message>>(client.PacketAssembler.Data);
+                            SerManager.DeserializeWithLengthPrefix<List<Message>>(packetAssembler.Data);
+
+                        packetAssembler.ResetData();
                         
-                        bool parsed = this.ParseRequest(client, messages[0]);
+                        this.ParseReceived(client, messages[0]);
 
-                        if (!parsed)
-                        {
-                            return;
-                        }
-
-                        // clean the packet assembler
-                        client.PacketAssembler.ResetData();
+                        this.BeginReceiveClean(client);
+                        return;
                     }
                 }
 
-                this.BeginReceive(client);
+                this.BeginReceive(state);
             }
             catch (Exception e)
             {
                 if (client != null)
                 {
-                    this.SendToThenDropConnection(client, Messages.InternalErrorDrop);
+                    this.SendToThenDropConnection(client, new Message<string>(Service.None, Messages.InternalErrorDrop));
                 }
 
                 Console.WriteLine(e.ToString());
             }         
         }
 
-        private void BeginReceive(ConnectedClient client)
+        private void BeginReceive(Tuple<Client, PacketAssembler> state)
         {
-            client.Socket.BeginReceive(
-                        client.PacketAssembler.DataBuffer,
+            state.Item1.Socket.BeginReceive(
+                        state.Item2.DataBuffer,
                         0,
                         PacketAssembler.PacketSize,
                         SocketFlags.None,
                         this.ReceiveCallback,
-                        client);
+                        state);
         }
 
-        private void Broadcast(string data)
+        private void BeginReceiveClean(Client client)
+        {
+            PacketAssembler packetAssembler = new PacketAssembler();
+ 
+            client.Socket.BeginReceive(
+                packetAssembler.DataBuffer,
+                0,
+                PacketAssembler.PacketSize,
+                SocketFlags.None,
+                this.ReceiveCallback,
+                Tuple.Create(client, packetAssembler));
+        }
+
+        private void Broadcast(Message message)
         {
             foreach (var client in this.clients)
             {
-                this.SendTo(client, data);
+                this.SendTo(client, message);
             }
         }
 
-        private void SendTo(ConnectedClient client, string data)
+        public void SendTo(Client client, Message message)
         {
             try
             {
@@ -175,7 +191,8 @@
                     throw new InvalidOperationException("Cannot send data to non validated clients");
                 }
 
-                byte[] dataBytes = Encoding.ASCII.GetBytes(data);
+                byte[] dataBytes = SerManager.SerializeWithLengthPrefix(message);
+                Message check = SerManager.DeserializeWithLengthPrefix<Message>(dataBytes);
 
                 client.Socket.BeginSend(dataBytes, 0, dataBytes.Length, SocketFlags.None, this.SendToCallback, client);
             }
@@ -185,128 +202,134 @@
             }
         }
 
-        private void SendToThenDropConnection(ConnectedClient client, string data)
+        private void SendToThenDropConnection(Client client, Message message)
         {
             try
             {
                 if (client.Socket.Connected)
                 {
-                    byte[] dataBytes = Encoding.ASCII.GetBytes(data);
+                    byte[] dataBytes = SerManager.SerializeWithLengthPrefix(message);
 
                     client.Socket.Send(dataBytes);
                 }
 
-                client.Close();
+                client.Dispose();
                 this.clients.Remove(client);
                 client = null;
             }
             catch (Exception e)
             {
+                client?.Dispose();
+                this.clients.Remove(client);
+                client = null;
                 Console.WriteLine(e.ToString());
             }          
         }
 
         private void SendToCallback(IAsyncResult result)
         {
-            ConnectedClient client = (ConnectedClient)result.AsyncState;
+            Client client = (Client)result.AsyncState;
 
             int bytesSent = client.Socket.EndSend(result);
 
             Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, client.AuthData.Username);
         }
 
-        private bool ParseRequest(ConnectedClient client, Message message)
+        private bool ParseReceived(Client client, Message message)
         {
             int err;
             switch (message.Service)
             {
                 case Service.None:
-                    this.SendToThenDropConnection(client, "Invalid service request");
+                    this.SendToThenDropConnection(client, new Message<string>(Service.Login, Messages.InternalErrorDrop));
                     return false;
                 case Service.Login:
-                    AuthDataRawDTO authDataRaw = ((Message<AuthDataRawDTO>)message).Data;
+                    AuthDataRaw authDataRaw = ((Message<AuthDataRaw>)message).Data;
                     AuthDataSecure authDataSecure = new AuthDataSecure(authDataRaw.Username, authDataRaw.Password);
+                    authDataRaw.Password = string.Empty;
 
-                    // clean insecure data from memory
-                    authDataRaw = null;
-
-                    client.AuthData = authDataSecure;
-
-                    err = RequestHandler.Login(client);
+                    err = RequestHandler.Login(client, authDataSecure);
 
                     switch (err)
                     {
                         case 0:
-                            this.SendTo(client, Messages.LogoutSuccess);
+                            ServerManager.Instance.Listener.SendTo(client, new Message<string>          (Service.Login, Messages.LoginSuccess));
                             break;
                         case ErrorCodes.InvalidCredentialsError:
-                            this.SendTo(client, Messages.InvalidCredentials);
+                            this.SendTo(client, new Message<string>
+                                (Service.Login, Messages.InvalidCredentials));
                             break;
                         case ErrorCodes.InternalError:
                             this.SendTo(
-                                client, Messages.SomethingWentWrong);
+                                client, new Message<string>(Service.Login, Messages.SomethingWentWrong));
                             break;
                         default:
                             this.SendToThenDropConnection(
-                                client, Messages.InternalErrorDrop);
+                                client, new Message<string>(Service.None, Messages.InternalErrorDrop));
                             return false;
                     }
 
                     break;
 
                 case Service.Logout:
-                    // change state to logged out
                     err = RequestHandler.Logout(client);
                     switch (err)
                     {
                         case 0:
-                            this.SendToThenDropConnection(client, Messages.LogoutSuccess);
+                            this.SendToThenDropConnection(client, 
+                                new Message<string>(Service.Logout, Messages.LogoutSuccess));
                             break;
                         case ErrorCodes.LogoutError:
-                            this.SendTo(client, Messages.DataNotSaved);
+                            this.SendTo(client, new Message<string>
+                                (Service.Logout, Messages.DataNotSaved));
                             break;
                         default:
                             this.SendToThenDropConnection(
-                                client, Messages.InternalErrorDrop);
+                                client, new Message<string>
+                                (Service.Logout, Messages.InternalErrorDrop));
                             return false;
                     }
 
                     break;
 
                 case Service.Registration:
-                    err = RequestHandler.Register(client);
+                    AuthDataRaw authDataInsecure = ((Message<AuthDataRaw>)message).Data;
+                    AuthDataSecure authDataReg = new AuthDataSecure(authDataInsecure.Username, authDataInsecure.Password);
+                    authDataInsecure.Password = string.Empty;
+
+                    err = RequestHandler.Register(client, authDataReg);
 
                     switch (err)
                     {
                         case 0:
                             this.SendTo(
                             client,
-                            Messages.RegisterSuccessful);
+                            new Message<string>(Service.Registration, Messages.RegisterSuccessful));
                             break;
                         case ErrorCodes.AlreadyLoggedIn:
                             this.SendTo(
                             client,
-                            Messages.AlreadyLoggedIn);
+                            new Message<string>(Service.Registration, Messages.AlreadyLoggedIn));
                             break;
                         case ErrorCodes.UsernameEmptyError:
                             this.SendTo(
                             client,
-                            Messages.EmptyUsername);
+                            new Message<string>(Service.Registration, Messages.EmptyUsername));
                             break;
                         case ErrorCodes.PasswordEmptyError:
                             this.SendTo(
                             client,
-                            Messages.EmptyPassword);
+                            new Message<string>(Service.Registration, Messages.EmptyPassword));
                             break;
                         case ErrorCodes.UsernameTakenError:
                             this.SendTo(
                             client,
-                            Messages.UsernameTaken);
+                            new Message<string>(Service.Registration, Messages.UsernameTaken));
                             break;
                         default:
                             this.SendToThenDropConnection(
                             client,
-                            Messages.InternalErrorDrop);
+                            new Message<string>(Service.Registration, Messages.InternalErrorDrop));
                             return false;
                     }
 
@@ -328,6 +351,16 @@
             }
 
             return IPAddress.Parse("127.0.0.1");
+        }
+
+        public void Dispose()
+        {
+            foreach (var client in this.clients)
+            {
+                client.Dispose();
+                this.listener.Close();
+                this.listener.Dispose();
+            }
         }
     }
 }
