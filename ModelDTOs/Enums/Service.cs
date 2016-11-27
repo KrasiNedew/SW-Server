@@ -1,6 +1,6 @@
 ﻿namespace ModelDTOs.Enums
 {
-    public enum ServiceRequest
+    public enum Service
     {
         None = 0,
         Login = 1,

@@ -19,9 +19,9 @@
             return new AuthDataSecure(relevantData.Username, relevantData.Password);
         }
 
-        public static ServiceRequest ExtractServiceRequest(string data)
+        public static Service ExtractServiceRequest(string data)
         {
-            var relevantData = JsonConvert.DeserializeAnonymousType(data, new { ServiceType = ServiceRequest.None });
+            var relevantData = JsonConvert.DeserializeAnonymousType(data, new { ServiceType = Service.None });
 
             return relevantData.ServiceType;
         }

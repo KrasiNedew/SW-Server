@@ -53,7 +53,6 @@
             while (true)
             {
                 this.allDone.Reset();
-                //this.clients.RemoveWhere(client => !client.Socket.Connected);
 
                 try
                 {
@@ -104,7 +103,7 @@
                     if (streamDataLength > 0)
                     {
                         client.PacketAssembler.BytesToRead = streamDataLength;
-                        client.PacketAssembler.AllocateSpaceForReceiving(streamDataLength);
+                        client.PacketAssembler.AllocateSpace(streamDataLength);
                     }
                 } 
 
@@ -119,11 +118,11 @@
 
                     if (client.PacketAssembler.BytesRead >= client.PacketAssembler.BytesToRead)
                     {
-                        // handle the client request
-                        RequestDTO requestDto =
-                            SerializationManager.DeserializeWithLengthPrefix<RequestDTO>(client.PacketAssembler.Data);
+                        // handle the client service
+                        List<Message> messages =
+                            SerializationManager.DeserializeWithLengthPrefix<List<Message>>(client.PacketAssembler.Data);
                         
-                        bool parsed = this.ParseRequest(client, requestDto);
+                        bool parsed = this.ParseRequest(client, messages[0]);
 
                         if (!parsed)
                         {
@@ -131,10 +130,7 @@
                         }
 
                         // clean the packet assembler
-                        client.PacketAssembler.CleanDataBuffer();
-                        client.PacketAssembler.CleanData();
-
-                        client.PacketAssembler.BytesToRead = 0;
+                        client.PacketAssembler.ResetData();
                     }
                 }
 
@@ -212,23 +208,23 @@
 
         private void SendToCallback(IAsyncResult result)
         {
-            ConnectedClient client = (ConnectedClient)result;
+            ConnectedClient client = (ConnectedClient)result.AsyncState;
 
             int bytesSent = client.Socket.EndSend(result);
 
             Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, client.AuthData.Username);
         }
 
-        private bool ParseRequest(ConnectedClient client, RequestDTO requestDto)
+        private bool ParseRequest(ConnectedClient client, Message message)
         {
             int err;
-            switch (requestDto.Request)
+            switch (message.Service)
             {
-                case ServiceRequest.None:
-                    this.SendToThenDropConnection(client, "Invalid request");
+                case Service.None:
+                    this.SendToThenDropConnection(client, "Invalid service request");
                     return false;
-                case ServiceRequest.Login:
-                    AuthDataRawDTO authDataRaw = ((RequestDTO<AuthDataRawDTO>)requestDto).Data;
+                case Service.Login:
+                    AuthDataRawDTO authDataRaw = ((Message<AuthDataRawDTO>)message).Data;
                     AuthDataSecure authDataSecure = new AuthDataSecure(authDataRaw.Username, authDataRaw.Password);
 
                     // clean insecure data from memory
@@ -258,7 +254,7 @@
 
                     break;
 
-                case ServiceRequest.Logout:
+                case Service.Logout:
                     // change state to logged out
                     err = RequestHandler.Logout(client);
                     switch (err)
@@ -277,7 +273,7 @@
 
                     break;
 
-                case ServiceRequest.Registration:
+                case Service.Registration:
                     err = RequestHandler.Register(client);
 
                     switch (err)

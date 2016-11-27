@@ -15,7 +15,7 @@
         public PacketAssembler()
         {
             this.DataBuffer = new byte[PacketSize];
-            this.Data = new byte[PacketSize*2];
+            this.Data = new byte[PacketSize * 2];
         }
 
         public byte[] DataBuffer { get; private set; }
@@ -35,7 +35,7 @@
         {
             if (this.BytesRead + bytesReceived > this.Data.Length)
             {
-                throw new InvalidOperationException("Request length header not found");
+                throw new InvalidOperationException("Service length header not found");
             }
 
             for (int i = this.BytesRead, j = 0; j < bytesReceived; i++, j++)
@@ -47,14 +47,14 @@
             this.CleanDataBuffer();
         }
 
-        public void CleanData()
+        public void ResetData()
         {
-            this.Data = new byte[PacketSize];
+            this.Data = new byte[PacketSize * 2];
             this.BytesRead = 0;
             this.CleanDataBuffer();
         }
 
-        public void AllocateSpaceForReceiving(int bytes)
+        public void AllocateSpace(int bytes)
         {
             byte[] temp = new byte[this.Data.Length];
             this.Data.CopyTo(temp, 0);
