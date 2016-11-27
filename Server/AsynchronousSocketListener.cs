@@ -92,32 +92,30 @@
             try
             {
                 int bytesReceived = client.Socket.EndReceive(result);
-               
+                bool pushed = false;
+
                 if (client.PacketAssembler.BytesToRead == 0)
                 {
-                    int length;
+                    client.PacketAssembler.PushReceivedData(bytesReceived);
+                    pushed = true;
 
-                    Serializer.TryReadLengthPrefix(
-                        client.PacketAssembler.DataBuffer,
-                        0,
-                        client.PacketAssembler.DataBuffer.Length,
-                        PrefixStyle.Base128,
-                        out length);
+                    int streamDataLength = SerializationManager.GetLength(client.PacketAssembler.Data);
 
-                    length += 1;
-
-                    if (length > 0)
+                    if (streamDataLength > 0)
                     {
-                        client.PacketAssembler.BytesToRead = length;
-                        client.PacketAssembler.AllocateSpaceForReceiving(length);
+                        client.PacketAssembler.BytesToRead = streamDataLength;
+                        client.PacketAssembler.AllocateSpaceForReceiving(streamDataLength);
                     }
                 } 
 
                 if (bytesReceived > 0 && client.PacketAssembler.BytesToRead > 0)
                 {
-                    client.PacketAssembler.PushReceivedData(bytesReceived);
-                    client.PacketAssembler.BytesRead += bytesReceived;
-                    client.PacketAssembler.CleanDataBuffer();
+                    if (!pushed)
+                    {
+                        client.PacketAssembler.PushReceivedData(bytesReceived);
+                        pushed = true;
+                    }
+
 
                     if (client.PacketAssembler.BytesRead >= client.PacketAssembler.BytesToRead)
                     {
@@ -230,11 +228,11 @@
                     this.SendToThenDropConnection(client, "Invalid request");
                     return false;
                 case ServiceRequest.Login:
-                    AuthDataRawDTO authData = ((RequestDTO<AuthDataRawDTO>)requestDto).Data;
-                    AuthDataSecure authDataSecure = new AuthDataSecure(authData.Username, authData.Password);
+                    AuthDataRawDTO authDataRaw = ((RequestDTO<AuthDataRawDTO>)requestDto).Data;
+                    AuthDataSecure authDataSecure = new AuthDataSecure(authDataRaw.Username, authDataRaw.Password);
 
                     // clean insecure data from memory
-                    authData = null;
+                    authDataRaw = null;
 
                     client.AuthData = authDataSecure;
 

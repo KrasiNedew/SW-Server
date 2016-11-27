@@ -15,5 +15,7 @@
         public const int UsernameEmptyError = 6;
 
         public const int AlreadyLoggedIn = 7;
+
+        public const int InvalidRequestHeader = 8;
     }
 }
