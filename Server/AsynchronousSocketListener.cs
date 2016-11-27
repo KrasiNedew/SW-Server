@@ -3,6 +3,7 @@
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.IO;
     using System.Linq;
     using System.Net;
     using System.Net.Sockets;
@@ -11,8 +12,11 @@
     using System.Threading.Tasks;
 
     using ModelDTOs;
+    using ModelDTOs.Enums;
 
     using Newtonsoft.Json;
+
+    using ProtoBuf;
 
     using Serialization;
 
@@ -88,27 +92,51 @@
             try
             {
                 int bytesReceived = client.Socket.EndReceive(result);
-
-                if (bytesReceived > 0)
+               
+                if (client.PacketAssembler.BytesToRead == 0)
                 {
-                    Packet received = new Packet(client.PacketAssembler.DataBuffer);
-                    client.PacketAssembler.Packets.Add(received);
+                    int length;
 
+                    Serializer.TryReadLengthPrefix(
+                        client.PacketAssembler.DataBuffer,
+                        0,
+                        client.PacketAssembler.DataBuffer.Length,
+                        PrefixStyle.Base128,
+                        out length);
+
+                    length += 1;
+
+                    if (length > 0)
+                    {
+                        client.PacketAssembler.BytesToRead = length;
+                        client.PacketAssembler.AllocateSpaceForReceiving(length);
+                    }
+                } 
+
+                if (bytesReceived > 0 && client.PacketAssembler.BytesToRead > 0)
+                {
+                    client.PacketAssembler.PushReceivedData(bytesReceived);
+                    client.PacketAssembler.BytesRead += bytesReceived;
                     client.PacketAssembler.CleanDataBuffer();
 
-                    if (received.GetStringFromRawData().EndsWith("<EOF>"))
+                    if (client.PacketAssembler.BytesRead >= client.PacketAssembler.BytesToRead)
                     {
-                        string data = client.PacketAssembler.ReceivedStringData;
+                        // handle the client request
+                        RequestDTO requestDto =
+                            SerializationManager.DeserializeWithLengthPrefix<RequestDTO>(client.PacketAssembler.Data);
+                        
+                        bool parsed = this.ParseRequest(client, requestDto);
+
+                        if (!parsed)
+                        {
+                            return;
+                        }
 
                         // clean the packet assembler
                         client.PacketAssembler.CleanDataBuffer();
-                        client.PacketAssembler.CleanPackets();
+                        client.PacketAssembler.CleanData();
 
-                        ServiceRequest request = Deserializer.ExtractServiceRequest(data);
-                        this.ParseRequest(client, request, data);
-
-                        // log the data
-                        Console.WriteLine(JsonConvert.DeserializeObject(data));
+                        client.PacketAssembler.BytesToRead = 0;
                     }
                 }
 
@@ -130,7 +158,7 @@
             client.Socket.BeginReceive(
                         client.PacketAssembler.DataBuffer,
                         0,
-                        Packet.Size,
+                        PacketAssembler.PacketSize,
                         SocketFlags.None,
                         this.ReceiveCallback,
                         client);
@@ -165,13 +193,23 @@
 
         private void SendToThenDropConnection(ConnectedClient client, string data)
         {
-            byte[] dataBytes = Encoding.ASCII.GetBytes(data);
+            try
+            {
+                if (client.Socket.Connected)
+                {
+                    byte[] dataBytes = Encoding.ASCII.GetBytes(data);
 
-            client.Socket.Send(dataBytes);
+                    client.Socket.Send(dataBytes);
+                }
 
-            client.Close();
-            this.clients.Remove(client);
-            client = null;
+                client.Close();
+                this.clients.Remove(client);
+                client = null;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }          
         }
 
         private void SendToCallback(IAsyncResult result)
@@ -183,19 +221,30 @@
             Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, client.AuthData.Username);
         }
 
-        private bool ParseRequest(ConnectedClient client, ServiceRequest request, string data)
+        private bool ParseRequest(ConnectedClient client, RequestDTO requestDto)
         {
             int err;
-            switch (request)
+            switch (requestDto.Request)
             {
-                case ServiceRequest.Unknown:
+                case ServiceRequest.None:
                     this.SendToThenDropConnection(client, "Invalid request");
                     return false;
                 case ServiceRequest.Login:
-                    err = RequestHandler.Login(client, data);
+                    AuthDataRawDTO authData = ((RequestDTO<AuthDataRawDTO>)requestDto).Data;
+                    AuthDataSecure authDataSecure = new AuthDataSecure(authData.Username, authData.Password);
+
+                    // clean insecure data from memory
+                    authData = null;
+
+                    client.AuthData = authDataSecure;
+
+                    err = RequestHandler.Login(client);
 
                     switch (err)
                     {
+                        case 0:
+                            this.SendTo(client, Messages.LogoutSuccess);
+                            break;
                         case ErrorCodes.InvalidCredentialsError:
                             this.SendTo(client, Messages.InvalidCredentials);
                             break;
@@ -231,7 +280,7 @@
                     break;
 
                 case ServiceRequest.Registration:
-                    err = RequestHandler.Register(client, data);
+                    err = RequestHandler.Register(client);
 
                     switch (err)
                     {

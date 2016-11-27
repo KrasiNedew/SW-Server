@@ -11,7 +11,7 @@
     {
         public Socket Socket { get; }
 
-        public AuthData AuthData { get; set; }
+        public AuthDataSecure AuthData { get; set; }
 
         public PacketAssembler PacketAssembler { get; set; }
 

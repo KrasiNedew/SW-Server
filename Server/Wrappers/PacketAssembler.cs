@@ -1,46 +1,47 @@
 ﻿namespace Server.Wrappers
 {
     using System.Collections.Generic;
-    using System.Linq;
+    using ModelDTOs.Enums;
 
     public class PacketAssembler
     {
+        public const int PacketSize = 512;
+
         public PacketAssembler()
         {
-            this.Packets = new List<Packet>();
-            this.DataBuffer = new byte[Packet.Size];
+            this.DataBuffer = new byte[PacketSize];
+            this.Data = new byte[0];
         }
 
         public byte[] DataBuffer { get; private set; }
 
-        public List<Packet> Packets { get; private set; }
+        public byte[] Data { get; private set; }
 
-        public byte[] ReceivedRawData
-        {
-            get
-            {
-                return this.Packets.SelectMany(r => r.DataRaw).ToArray();
-            }
-        }
+        public int BytesToRead { get; set; }
 
-        public string ReceivedStringData
-        {
-            get
-            {
-                string val = string.Join(string.Empty, this.Packets.Select(p => p.GetStringFromRawData()));
-
-                return val.EndsWith("<EOF>") ? val.Remove(val.Length - 5) : val;
-            }
-        }
+        public int BytesRead { get; set; }
 
         public void CleanDataBuffer()
         {
-            this.DataBuffer = new byte[Packet.Size];
+            this.DataBuffer = new byte[PacketSize];
         }
 
-        public void CleanPackets()
+        public void PushReceivedData(int bytesReceived)
         {
-            this.Packets = new List<Packet>();
+            for (int i = this.BytesRead, j = 0; j < bytesReceived; i++, j++)
+            {
+                this.Data[i] = this.DataBuffer[j];
+            }
+        }
+
+        public void CleanData()
+        {
+            this.Data = new byte[0];
+        }
+
+        public void AllocateSpaceForReceiving(int bytes)
+        {
+            this.Data = new byte[bytes];
         }
     }
 }

@@ -8,10 +8,8 @@
 
     public static class RequestHandler
     {
-        public static int Login(ConnectedClient client, string data)
+        public static int Login(ConnectedClient client)
         {
-            client.AuthData = Deserializer.ExtractAuthData(data);
-
             // logic for login
             client.Validated = true;
 
@@ -25,16 +23,16 @@
             return 0;
         }
 
-        public static int Register(ConnectedClient client, string data)
+        public static int Register(ConnectedClient client)
         {
             if (client.Validated)
             {
                 return ErrorCodes.AlreadyLoggedIn;
             }
 
-            AuthData credentials = Deserializer
-                    .ExtractAuthData(data);
-            client.AuthData = credentials;
+            //AuthData credentials = Deserializer
+            //        .ExtractAuthData(data);
+            //client.AuthData = credentials;
             return 0;
         }
     }

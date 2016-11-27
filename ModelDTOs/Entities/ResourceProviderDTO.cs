@@ -1,7 +1,12 @@
 ﻿namespace ModelDTOs.Entities
 {
+    using System;
+
     using ModelDTOs.Resources;
 
+    using ProtoBuf;
+
+    [ProtoContract]
     public class ResourceProviderDTO : EntityDTO
     {
         protected ResourceProviderDTO()
@@ -21,14 +26,16 @@
             float weight,
             string type,
             PlayerDTO owner)
-            : base(posX, posY, posZ, rotX, rotY, rotZ, scale, weight, type, BaseEntityType.ResourceProvider, owner)
+            : base(posX, posY, posZ, rotX, rotY, rotZ, scale, weight, type, owner)
         {
             this.Quantity = quantity;
             this.ResourceType = resourceType;
         }
 
+        [ProtoMember(13)]
         public int Quantity { get; set; }
 
+        [ProtoMember(14)]
         public ResourceType ResourceType { get; set; }
     }
 }

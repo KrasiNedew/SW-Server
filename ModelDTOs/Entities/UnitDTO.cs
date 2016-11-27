@@ -1,10 +1,14 @@
 ﻿namespace ModelDTOs.Entities
 {
-    public abstract class UnitDTO : EntityDTO
+    using System;
+
+    using ProtoBuf;
+
+    [ProtoContract]
+    public class UnitDTO : EntityDTO
     {
         protected UnitDTO()
         {
-            
         }
 
         public UnitDTO(
@@ -20,14 +24,16 @@
             float weight,
             string type,
             PlayerDTO owner)
-            : base(posX, posY, posZ, rotX, rotY, rotZ, scale, weight, type, BaseEntityType.Unit, owner)
+            : base(posX, posY, posZ, rotX, rotY, rotZ, scale, weight, type, owner)
         {
             this.IsAlive = isAlive;
             this.Health = health;
         }
 
+        [ProtoMember(13)]
         public bool IsAlive { get; set; }
 
+        [ProtoMember(14)]
         public int Health { get; set; }
 
     }

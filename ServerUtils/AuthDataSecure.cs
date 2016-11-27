@@ -2,9 +2,9 @@
 {
     using System.Text;
 
-    public class AuthData
+    public class AuthDataSecure
     {
-        public AuthData(string username, string password)
+        public AuthDataSecure(string username, string password)
         {
             this.Username = username;
             this.PasswordHash = GenerateHash(password);

@@ -1,8 +1,8 @@
-﻿namespace ServerUtils
+﻿namespace ModelDTOs.Enums
 {
     public enum ServiceRequest
     {
-        Unknown = 0,
+        None = 0,
         Login = 1,
         Logout = 2,
         Registration = 3,
