@@ -128,8 +128,8 @@
                         List<Message> messages =
                             SerManager.DeserializeWithLengthPrefix<List<Message>>(packetAssembler.Data);
 
-                        packetAssembler.ResetData();
-                        
+                        packetAssembler.Dispose();
+
                         this.ParseReceived(client, messages[0]);
 
                         this.BeginReceiveClean(client);
@@ -259,7 +259,7 @@
                             this.SendTo(client, new Message<string>
                                 (Service.Login, Messages.InvalidCredentials));
                             break;
-                        case ErrorCodes.InternalError:
+                        case ErrorCodes.AlreadyLoggedIn:
                             this.SendTo(
                                 client, new Message<string>(Service.Login, Messages.SomethingWentWrong));
                             break;

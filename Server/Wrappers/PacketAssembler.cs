@@ -1,20 +1,14 @@
 ﻿namespace Server.Wrappers
 {
     using System;
-    using System.Collections.Generic;
-    using System.Linq;
 
-    using ModelDTOs.Enums;
-
-    using Server.Handlers;
-
-    public class PacketAssembler
+    public class PacketAssembler : IDisposable
     {
         public const int PacketSize = 512;
 
         public PacketAssembler()
         {
-            this.DataBuffer = new byte[PacketSize];
+            this.DataBuffer = BufferManager.Give();
             this.Data = new byte[PacketSize * 2];
         }
 
@@ -28,7 +22,15 @@
 
         public void CleanDataBuffer()
         {
-            this.DataBuffer = new byte[PacketSize];
+            // Storing the ref to the buffer.
+            byte[] temp = this.DataBuffer;
+
+            // Pushes the buffer on the blocking queue to be cleaned on background thread.
+            // No time overhead.
+            BufferManager.TakeBack(temp);
+
+            // Take clean buffer immediately
+            this.DataBuffer = BufferManager.Give();
         }
 
         public void PushReceivedData(int bytesReceived)
@@ -47,14 +49,6 @@
             this.CleanDataBuffer();
         }
 
-        public void ResetData()
-        {
-            this.Data = new byte[PacketSize * 2];
-            this.BytesRead = 0;
-            this.BytesToRead = 0;
-            this.CleanDataBuffer();
-        }
-
         public void AllocateSpace(int bytes)
         {
             byte[] temp = new byte[this.Data.Length];
@@ -67,6 +61,12 @@
             {
                 this.Data[i] = temp[i];
             }
+        }
+
+        public void Dispose()
+        {
+            this.Data = null;
+            BufferManager.TakeBack(this.DataBuffer);
         }
     }
 }

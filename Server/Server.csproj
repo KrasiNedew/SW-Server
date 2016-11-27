@@ -63,6 +63,7 @@
     <Compile Include="Handlers\RequestHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ServerManager.cs" />
+    <Compile Include="Wrappers\BufferManager.cs" />
     <Compile Include="Wrappers\Client.cs" />
     <Compile Include="Wrappers\PacketAssembler.cs" />
   </ItemGroup>
