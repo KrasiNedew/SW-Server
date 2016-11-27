@@ -254,14 +254,14 @@
         {
             try
             {
-                if (!client.Validated)
+                if (!client.Validated && !(message is Message<string>))
                 {
                     throw new InvalidOperationException("Cannot send data to non validated clients");
                 }
 
                 byte[] dataBytes = SerManager.SerializeWithLengthPrefix(message);
                 Message check = SerManager.DeserializeWithLengthPrefix<Message>(dataBytes);
-
+                Console.WriteLine(check.Service);
                 client.Socket.BeginSend(dataBytes, 0, dataBytes.Length, SocketFlags.None, this.SendToCallback, client);
             }
             catch (Exception e)
@@ -298,11 +298,18 @@
 
         private void SendToCallback(IAsyncResult result)
         {
-            Client client = (Client)result.AsyncState;
+            try
+            {
+                Client client = (Client)result.AsyncState;
 
-            int bytesSent = client.Socket.EndSend(result);
+                int bytesSent = client.Socket.EndSend(result);
 
-            Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, client.AuthData.Username);
+                Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, client.AuthData?.Username);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }
         }
 
         private void CheckForDisconnectedClients()
@@ -333,6 +340,7 @@
 
                     foreach (var discClient in disconnectedClients)
                     {
+                        this.TryLogout(discClient);
                         discClient.Dispose();
                         this.clients.Remove(discClient);
                     }
@@ -369,7 +377,7 @@
                             break;
                         case ErrorCodes.AlreadyLoggedIn:
                             this.SendTo(
-                                client, new Message<string>(Service.Login, Messages.SomethingWentWrong));
+                                client, new Message<string>(Service.Login, Messages.PlayerAlreadyLoggedIn));
                             break;
                         default:
                             this.SendToThenDropConnection(
@@ -451,10 +459,12 @@
                 return;
             }
 
+            AuthDataSecure authData = client.AuthData;
+
             using (SimpleWarsContext context = new SimpleWarsContext())
             {
                 var player = context.Players.FirstOrDefault(
-                    p => p.Username == client.AuthData.Username && p.PasswordHash == client.AuthData.PasswordHash);
+                    p => p.Username == authData.Username && p.PasswordHash == authData.PasswordHash);
 
                 if (player == null)
                 {

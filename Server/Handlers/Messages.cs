@@ -13,6 +13,8 @@
 
         public const string AlreadyLoggedIn = "You are already logged in";
 
+        public const string PlayerAlreadyLoggedIn = "Player is already logged in.";
+
         public const string EmptyUsername = "Username cannot be empty";
 
         public const string EmptyPassword = "Password cannot be empty";

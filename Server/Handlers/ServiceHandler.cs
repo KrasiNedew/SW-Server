@@ -36,6 +36,13 @@
                     return ErrorCodes.InvalidCredentialsError;
                 }
 
+                if (player.LoggedIn)
+                {
+                    return ErrorCodes.AlreadyLoggedIn;
+                }
+
+                player.LoggedIn = true;
+                context.SaveChanges();
                 client.Validated = true;
                 client.AuthData = authData;
                 ServerManager.Instance.Listener.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
