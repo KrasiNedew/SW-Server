@@ -7,6 +7,7 @@
         Logout = 2,
         Registration = 3,
         TestMessageSend = 4,
-        PlayerData = 5
+        PlayerData = 5,
+        SenderUsername
     }
 }

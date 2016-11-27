@@ -15,7 +15,7 @@
 
     using ServerUtils;
 
-    public static class RequestHandler
+    public static class ServiceHandler
     {
         public static int Login(Client client, AuthDataSecure authData)
         {

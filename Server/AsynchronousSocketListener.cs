@@ -1,13 +1,12 @@
 ﻿namespace Server
 {
     using System;
-    using System.Collections;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
-    using System.IO;
     using System.Linq;
     using System.Net;
+    using System.Net.NetworkInformation;
     using System.Net.Sockets;
-    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
 
@@ -15,10 +14,6 @@
 
     using ModelDTOs;
     using ModelDTOs.Enums;
-
-    using Newtonsoft.Json;
-
-    using ProtoBuf;
 
     using Serialization;
 
@@ -29,16 +24,22 @@
 
     public class AsynchronousSocketListener : IDisposable
     {
-        // Thread signal.
-        private readonly ManualResetEvent allDone;
+        private const int ConnectionCheckInterval = 6000;
 
-        private HashSet<Client> clients { get; set; }
+        private const int MaxNumberOfClients = 3000;
+
+        private const int Backlog = 50;
+
+        // Thread signal.
+        private readonly ManualResetEvent connectionHandle;
+
+        private readonly HashSet<Client> clients;
 
         private readonly Socket listener;
 
         public AsynchronousSocketListener()
         {
-            this.allDone = new ManualResetEvent(false);
+            this.connectionHandle = new ManualResetEvent(false);
             this.clients = new HashSet<Client>();
             this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         }
@@ -48,13 +49,15 @@
             IPEndPoint endPoint = new IPEndPoint(GetLocalIPAddress(), port);
             this.listener.Bind(endPoint);
 
-            this.listener.Listen(0);
+            this.listener.Listen(Backlog);
 
             Console.WriteLine("Server listening on " + endPoint.Address);
 
+            Task.Run(() => { this.CheckForDisconnectedClients(); });
+
             while (true)
             {
-                this.allDone.Reset();
+                this.connectionHandle.Reset();
 
                 try
                 {
@@ -65,14 +68,20 @@
                     Console.WriteLine(e.ToString());
                 }
 
-                this.allDone.WaitOne();
+                this.connectionHandle.WaitOne();
             }
         }
 
         private void AcceptCallback(IAsyncResult result)
         {
+            if (this.clients.Count == MaxNumberOfClients)
+            {
+                this.connectionHandle.Set();
+                return;
+            }
+
             Socket socket = this.listener.EndAccept(result);
-            this.allDone.Set();
+            this.connectionHandle.Set();
 
             if (socket == null)
             {
@@ -141,6 +150,8 @@
             }
             catch (Exception e)
             {
+                this.TryLogout(client);
+
                 if (client != null)
                 {
                     this.SendToThenDropConnection(client, new Message<string>(Service.None, Messages.InternalErrorDrop));
@@ -174,12 +185,69 @@
                 Tuple.Create(client, packetAssembler));
         }
 
-        private void Broadcast(Message message)
+        // Performs async broadcast to all clients
+        public void BroadcastToAll(Message message)
         {
-            foreach (var client in this.clients)
+            Task.Run(() =>
             {
-                this.SendTo(client, message);
-            }
+                try
+                {
+                    foreach (var client in this.clients)
+                    {
+                        try
+                        {
+                            this.SendTo(client, message);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine(e.ToString());
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Clients collection was probably modified");
+                    Console.WriteLine(e.ToString());
+                }
+            });
+        }
+
+        // Performs async broadcast to specified clients.
+        public void Send(Client sender, Message message, params Client[] receivers)
+        {
+            Task.Run(() =>
+            {
+                Message<string> senderUsername = new Message<string>(Service.SenderUsername, sender.AuthData.Username);
+
+                try
+                {
+                    switch (message.Service)
+                    {
+                        case Service.PlayerData:
+                            PlayerDTO player = (message as Message<PlayerDTO>)?.Data;
+                            player.PasswordHash = "";
+
+                            foreach (var client in receivers)
+                            {
+                                try
+                                {
+                                    this.SendTo(client, senderUsername);
+                                    this.SendTo(client, message);
+                                }
+                                catch (Exception e)
+                                {
+                                    Console.WriteLine(e.ToString());
+                                }
+                            }
+                            break;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Outer send exception");
+                    Console.WriteLine(e.ToString());
+                }
+            });          
         }
 
         public void SendTo(Client client, Message message)
@@ -213,12 +281,14 @@
                     client.Socket.Send(dataBytes);
                 }
 
+                this.TryLogout(client);
                 client.Dispose();
                 this.clients.Remove(client);
                 client = null;
             }
             catch (Exception e)
             {
+                this.TryLogout(client);
                 client?.Dispose();
                 this.clients.Remove(client);
                 client = null;
@@ -235,21 +305,59 @@
             Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, client.AuthData.Username);
         }
 
-        private bool ParseReceived(Client client, Message message)
+        private void CheckForDisconnectedClients()
+        {
+            while (true)
+            {
+                Thread.Sleep(ConnectionCheckInterval);
+
+                if (this.clients.Count == 0)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    foreach (var client in this.clients)
+                    {
+                        client.Connected = client.IsConnected();
+                    }
+                }
+                catch (Exception)
+                {
+                }
+
+                try
+                {
+                    var disconnectedClients = this.clients.Where(client => !client.Connected);
+
+                    foreach (var discClient in disconnectedClients)
+                    {
+                        discClient.Dispose();
+                        this.clients.Remove(discClient);
+                    }
+
+                }
+                catch (Exception)
+                {
+                }
+            }
+        }
+
+        private void ParseReceived(Client client, Message message)
         {
             int err;
             switch (message.Service)
             {
                 case Service.None:
                     this.SendToThenDropConnection(client, new Message<string>(Service.Login, Messages.InternalErrorDrop));
-                    return false;
+                    return;
                 case Service.Login:
                     AuthDataRaw authDataRaw = ((Message<AuthDataRaw>)message).Data;
                     AuthDataSecure authDataSecure = new AuthDataSecure(authDataRaw.Username, authDataRaw.Password);
                     authDataRaw.Password = string.Empty;
 
-                    err = RequestHandler.Login(client, authDataSecure);
-
+                    err = ServiceHandler.Login(client, authDataSecure);
                     switch (err)
                     {
                         case 0:
@@ -266,13 +374,13 @@
                         default:
                             this.SendToThenDropConnection(
                                 client, new Message<string>(Service.None, Messages.InternalErrorDrop));
-                            return false;
+                            return;
                     }
 
                     break;
 
                 case Service.Logout:
-                    err = RequestHandler.Logout(client);
+                    err = ServiceHandler.Logout(client);
                     switch (err)
                     {
                         case 0:
@@ -287,7 +395,7 @@
                             this.SendToThenDropConnection(
                                 client, new Message<string>
                                 (Service.Logout, Messages.InternalErrorDrop));
-                            return false;
+                            return;
                     }
 
                     break;
@@ -297,8 +405,7 @@
                     AuthDataSecure authDataReg = new AuthDataSecure(authDataInsecure.Username, authDataInsecure.Password);
                     authDataInsecure.Password = string.Empty;
 
-                    err = RequestHandler.Register(client, authDataReg);
-
+                    err = ServiceHandler.Register(client, authDataReg);
                     switch (err)
                     {
                         case 0:
@@ -330,13 +437,33 @@
                             this.SendToThenDropConnection(
                             client,
                             new Message<string>(Service.Registration, Messages.InternalErrorDrop));
-                            return false;
+                            return;
                     }
 
                     break;
             }
+        }
 
-            return true;
+        private void TryLogout(Client client)
+        {
+            if (client?.AuthData == null)
+            {
+                return;
+            }
+
+            using (SimpleWarsContext context = new SimpleWarsContext())
+            {
+                var player = context.Players.FirstOrDefault(
+                    p => p.Username == client.AuthData.Username && p.PasswordHash == client.AuthData.PasswordHash);
+
+                if (player == null)
+                {
+                    return;
+                }
+
+                player.LoggedIn = false;
+                context.SaveChanges();
+            }
         }
 
         private static IPAddress GetLocalIPAddress()
