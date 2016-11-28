@@ -2,14 +2,10 @@
 {
     using System;
     using System.Linq;
-    using System.Threading.Tasks;
-
     using Data;
 
     using ModelDTOs;
     using ModelDTOs.Enums;
-
-    using Serialization;
 
     using Server.Wrappers;
 
@@ -45,10 +41,41 @@
                 context.SaveChanges();
                 client.Validated = true;
                 client.AuthData = authData;
-                ServerManager.Instance.Listener.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
+                Writer.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
+                Console.WriteLine($"Client {client.AuthData.Username} logged in");
             }
 
             return 0;
+        }
+
+        public static void TryLogout(Client client)
+        {
+            try
+            {
+                if (client == null || (client != null && client.AuthData == null))
+                {
+                    return;
+                }
+
+                AuthDataSecure authData = client?.AuthData;
+
+                using (SimpleWarsContext context = new SimpleWarsContext())
+                {
+                    var player = context.Players.FirstOrDefault(
+                        p => p.Username == authData.Username && p.PasswordHash == authData.PasswordHash);
+
+                    if (player == null)
+                    {
+                        return;
+                    }
+
+                    player.LoggedIn = false;
+                    context.SaveChanges();
+                }
+            }
+            catch
+            {
+            }
         }
 
         public static int Logout(Client client)
@@ -106,7 +133,7 @@
                 context.SaveChanges();
                 client.AuthData = authData;
                 client.Validated = true;
-                ServerManager.Instance.Listener.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));   
+                Writer.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));   
             }
 
             return 0;

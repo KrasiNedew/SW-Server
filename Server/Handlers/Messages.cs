@@ -26,5 +26,7 @@
         public const string LogoutSuccess = "Logged out successfuly";
 
         public const string DataNotSaved = "An error occured while saving your data.";
+
+        public const string ConnectionLimitReached = "Server is busy. Try again later later.";
     }
 }

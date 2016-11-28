@@ -17,14 +17,16 @@
 
         public bool Connected { get; set; }
 
+        public bool Disposed { get; set; }
+
         public bool IsConnected()
         {
             try
             {
                 int sent = this.Socket.Send(PingByte);
-                return sent != 0;
+                return sent > 0;
             }
-            catch (Exception)
+            catch
             {
                 return false;
             }
@@ -40,6 +42,7 @@
         {
             this.Socket.Close();
             this.Socket.Dispose();
+            this.Disposed = true;
         }
     }
 }
