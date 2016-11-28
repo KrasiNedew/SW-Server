@@ -1,27 +1,18 @@
 ﻿namespace Server
 {
     using System;
-    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Linq;
     using System.Net;
-    using System.Net.NetworkInformation;
     using System.Net.Sockets;
     using System.Threading;
     using System.Threading.Tasks;
-
-    using Data;
-
     using ModelDTOs;
     using ModelDTOs.Enums;
-
-    using Serialization;
-
+    using Server.Constants;
     using Server.Handlers;
+    using Server.Services;
     using Server.Wrappers;
-
-    using ServerUtils;
-
     public class AsynchronousSocketListener : IDisposable
     {
         private const int ConnectionCheckInterval = 6000;
@@ -92,7 +83,7 @@
 
             this.clients.Add(client);
 
-            Reader.BeginReceiveContinuous(client);
+            Reader.ReadMessagesContinously(client);
         }
 
         private void Heartbeat()
@@ -126,9 +117,9 @@
 
                     foreach (var discClient in disconnectedClients)
                     {
+                        AuthenticationServices.TryLogout(discClient);
                         try
                         {
-                            ServiceHandler.TryLogout(discClient);
                             if (!discClient.Disposed)
                             {
                                 discClient.Dispose();
@@ -139,7 +130,6 @@
                         }
                         catch
                         {
-                            ServiceHandler.TryLogout(discClient);
                             discClients += 1;
                             this.clients.Remove(discClient);
                         }

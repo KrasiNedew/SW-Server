@@ -1,4 +1,4 @@
-﻿namespace Server.Handlers
+﻿namespace Server.Constants
 {
     public static class ErrorCodes
     {

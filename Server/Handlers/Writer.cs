@@ -10,6 +10,7 @@
 
     using Serialization;
 
+    using Server.Services;
     using Server.Wrappers;
 
     public static class Writer
@@ -45,12 +46,12 @@
                     client.Socket.Send(dataBytes);
                 }
 
-                ServiceHandler.TryLogout(client);
+                AuthenticationServices.TryLogout(client);
                 client.Dispose();
             }
             catch (Exception e)
             {
-                ServiceHandler.TryLogout(client);
+                AuthenticationServices.TryLogout(client);
                 client?.Dispose();
                 Console.WriteLine(e.ToString());
             }

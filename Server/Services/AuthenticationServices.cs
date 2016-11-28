@@ -1,17 +1,20 @@
-﻿namespace Server.Handlers
+﻿namespace Server.Services
 {
     using System;
     using System.Linq;
+
     using Data;
 
     using ModelDTOs;
     using ModelDTOs.Enums;
 
+    using Server.Constants;
+    using Server.Handlers;
     using Server.Wrappers;
 
     using ServerUtils;
 
-    public static class ServiceHandler
+    public static class AuthenticationServices
     {
         public static int Login(Client client, AuthDataSecure authData)
         {
@@ -52,17 +55,19 @@
         {
             try
             {
-                if (client == null || (client != null && client.AuthData == null))
+                if (client?.AuthData == null)
                 {
                     return;
                 }
 
-                AuthDataSecure authData = client?.AuthData;
+                AuthDataSecure authData = client.AuthData;
 
                 using (SimpleWarsContext context = new SimpleWarsContext())
                 {
                     var player = context.Players.FirstOrDefault(
                         p => p.Username == authData.Username && p.PasswordHash == authData.PasswordHash);
+
+                    client.AuthData = null;
 
                     if (player == null)
                     {

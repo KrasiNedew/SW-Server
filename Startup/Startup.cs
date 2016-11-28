@@ -7,7 +7,7 @@
     {
         static void Main()
         {
-            BufferManager.Init();
+            Buffers.Init();
             ServerManager.Instance.StartServer(3000);
             ServerManager.Instance.Listener.Dispose();
         }

@@ -35,32 +35,35 @@
                 return 0;
             }
 
-            List<byte> length = new List<byte>(5) { 8 };
-            bool gotAny = false;
+            if (data[0] != 8)
+            {
+                // invalid prefix sent
+                return -1;
+            }
 
+            List<byte> prefixBytes = new List<byte>(5) { 8 };
             for (int i = 1; i < 5; i++)
             {
                 if (data[i] != 0)
                 {
-                    gotAny = true;
-                    length.Add(data[i]);
+                    prefixBytes.Add(data[i]);
                 }
             }
 
-            if (gotAny)
+            if (prefixBytes.Count <= 1)
             {
-                using (MemoryStream ms = new MemoryStream(length.ToArray()))
-                {
-                    return Serializer.Deserialize<int>(ms);
-                }
+                return 0;
             }
 
-            return 0;
+            using (MemoryStream ms = new MemoryStream(prefixBytes.ToArray()))
+            {
+                return Serializer.Deserialize<int>(ms);
+            }
         }
 
         public static T DeserializeWithLengthPrefix<T>(byte[] data)
         {
-            using (MemoryStream ms = new MemoryStream(data))
+            using (MemoryStream ms = new MemoryStream(data, 0, FindEnd(data)))
             {
                 ms.Seek(5, SeekOrigin.Begin);
                 return Serializer.Deserialize<T>(ms);
@@ -69,10 +72,21 @@
 
         public static T Deserialize<T>(byte[] data)
         {
-            using (MemoryStream ms = new MemoryStream(data))
+            using (MemoryStream ms = new MemoryStream(data, 0, FindEnd(data)))
             {
                 return Serializer.Deserialize<T>(ms);
             }
+        }
+
+        private static int FindEnd(byte[] buffer)
+        {
+            int i = buffer.Length - 1;
+            while (buffer[i] == 0)
+            {
+                i--;
+            }
+
+            return i + 1;
         }
     }
 }

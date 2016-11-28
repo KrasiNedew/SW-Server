@@ -3,6 +3,8 @@
     using ModelDTOs;
     using ModelDTOs.Enums;
 
+    using Server.Constants;
+    using Server.Services;
     using Server.Wrappers;
 
     using ServerUtils;
@@ -22,7 +24,7 @@
                     AuthDataSecure authDataSecure = new AuthDataSecure(authDataRaw.Username, authDataRaw.Password);
                     authDataRaw.Password = string.Empty;
 
-                    err = ServiceHandler.Login(client, authDataSecure);
+                    err = AuthenticationServices.Login(client, authDataSecure);
                     switch (err)
                     {
                         case 0:
@@ -44,7 +46,7 @@
                     break;
 
                 case Service.Logout:
-                    err = ServiceHandler.Logout(client);
+                    err = AuthenticationServices.Logout(client);
                     switch (err)
                     {
                         case 0:
@@ -69,7 +71,7 @@
                     AuthDataSecure authDataReg = new AuthDataSecure(authDataInsecure.Username, authDataInsecure.Password);
                     authDataInsecure.Password = string.Empty;
 
-                    err = ServiceHandler.Register(client, authDataReg);
+                    err = AuthenticationServices.Register(client, authDataReg);
                     switch (err)
                     {
                         case 0:

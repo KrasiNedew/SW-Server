@@ -58,16 +58,17 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AsynchronousSocketListener.cs" />
-    <Compile Include="Handlers\ErrorCodes.cs" />
-    <Compile Include="Handlers\Messages.cs" />
+    <Compile Include="Constants\ErrorCodes.cs" />
+    <Compile Include="Constants\Messages.cs" />
     <Compile Include="Handlers\Parser.cs" />
     <Compile Include="Handlers\Reader.cs" />
-    <Compile Include="Handlers\ServiceHandler.cs" />
+    <Compile Include="Services\AuthenticationServices.cs" />
     <Compile Include="Handlers\Writer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ServerManager.cs" />
-    <Compile Include="Wrappers\BufferManager.cs" />
+    <Compile Include="Wrappers\Buffers.cs" />
     <Compile Include="Wrappers\Client.cs" />
+    <Compile Include="Wrappers\LengthReceiver.cs" />
     <Compile Include="Wrappers\PacketAssembler.cs" />
   </ItemGroup>
   <ItemGroup>

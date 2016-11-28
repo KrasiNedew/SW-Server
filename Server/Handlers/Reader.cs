@@ -1,7 +1,6 @@
 ﻿namespace Server.Handlers
 {
     using System;
-    using System.Collections.Generic;
     using System.Net.Sockets;
 
     using ModelDTOs;
@@ -9,92 +8,68 @@
 
     using Serialization;
 
+    using Server.Constants;
+    using Server.Services;
     using Server.Wrappers;
 
     public static class Reader
     {
-        public static void BeginReceiveSingle(Client client)
+        public static void ReadSingleMessage(Client client)
         {
-            PacketAssembler packetAssembler = new PacketAssembler();
+            ReadLengthPrefix(client, false);
+        }
+
+        public static void ReadMessagesContinously(Client client)
+        {
+            ReadLengthPrefix(client, true);
+        }
+
+        private static void ReadMessage(Client client, int messageLength, bool continuous)
+        {
+            PacketAssembler packetAssembler = new PacketAssembler(messageLength);
 
             client.Socket.BeginReceive(
                 packetAssembler.DataBuffer,
                 0,
-                PacketAssembler.PacketSize,
+                messageLength,
                 SocketFlags.None,
-                ReceiveSingleCallback,
-                Tuple.Create(client, packetAssembler));
+                MessageReceivedCallback,
+                Tuple.Create(client, packetAssembler, continuous));
         }
 
-        public static void BeginReceiveContinuous(Client client)
+        private static void MessageReceivedCallback(IAsyncResult result)
         {
-            PacketAssembler packetAssembler = new PacketAssembler();
+            Tuple<Client, PacketAssembler, bool> state =
+                result.AsyncState as Tuple<Client, PacketAssembler, bool>;
+            if (state == null) return;
 
-            client.Socket.BeginReceive(
-                packetAssembler.DataBuffer,
-                0,
-                PacketAssembler.PacketSize,
-                SocketFlags.None,
-                ReceiveContinuousCallback,
-                Tuple.Create(client, packetAssembler));
-        }
-
-        private static void ReceiveContinuousCallback(IAsyncResult result)
-        {
-            Tuple<Client, PacketAssembler> state =
-                result.AsyncState as Tuple<Client, PacketAssembler>;
-
-            Client client = state?.Item1;
-            PacketAssembler packetAssembler = state?.Item2;
+            Client client = state.Item1;
+            PacketAssembler packetAssembler = state.Item2;
+            bool listenForNextMessage = state.Item3;
 
             try
             {
                 int bytesReceived = client.Socket.EndReceive(result);
-                bool pushed = false;
 
-                if (packetAssembler.BytesToRead == 0)
+                if (bytesReceived > 0)
                 {
-                    packetAssembler.PushReceivedData(bytesReceived);
-                    pushed = true;
+                    Message message =
+                        SerManager.Deserialize<Message>(packetAssembler.DataBuffer);
 
-                    int streamDataLength = SerManager.GetLengthPrefix(packetAssembler.Data);
+                    packetAssembler.Dispose();
 
-                    if (streamDataLength > 0)
+                    // handle the data
+                    Parser.ParseReceived(client, message);
+
+                    if (state.Item3)
                     {
-                        packetAssembler.BytesToRead = streamDataLength;
-                        packetAssembler.AllocateSpace(streamDataLength);
+                        ReadLengthPrefix(client, listenForNextMessage);
                     }
                 }
-
-                if (bytesReceived > 0 && packetAssembler.BytesToRead > 0)
-                {
-                    if (!pushed)
-                    {
-                        packetAssembler.PushReceivedData(bytesReceived);
-                        pushed = true;
-                    }
-
-
-                    if (packetAssembler.BytesRead >= packetAssembler.BytesToRead)
-                    {
-                        // handle the client service
-                        List<Message> messages =
-                            SerManager.DeserializeWithLengthPrefix<List<Message>>(packetAssembler.Data);
-
-                        packetAssembler.Dispose();
-
-                        Parser.ParseReceived(client, messages[0]);
-
-                        BeginReceiveContinuous(client);
-                        return;
-                    }
-                }
-
-                ContinueReceive(state);
             }
             catch (Exception e)
             {
-                ServiceHandler.TryLogout(client);
+                AuthenticationServices.TryLogout(client);
 
                 if (client != null)
                 {
@@ -105,90 +80,53 @@
             }
         }
 
-        private static void ReceiveSingleCallback(IAsyncResult result)
+        private static void ReadLengthPrefix(Client client, bool continuous)
         {
-            Tuple<Client, PacketAssembler> state =
-                result.AsyncState as Tuple<Client, PacketAssembler>;
+            LengthReceiver lengthReceiver = new LengthReceiver();
 
-            Client client = state?.Item1;
-            PacketAssembler packetAssembler = state?.Item2;
+            client.Socket.BeginReceive(
+                lengthReceiver.Buffer,
+                0,
+                LengthReceiver.LengthPrefixBytes,
+                SocketFlags.None,
+                LengthPrefixReceivedCallback,
+                Tuple.Create(client, lengthReceiver, continuous));
+        }
+
+        private static void LengthPrefixReceivedCallback(IAsyncResult result)
+        {
+            Tuple<Client, LengthReceiver, bool> state = (Tuple<Client, LengthReceiver, bool>)result.AsyncState;
 
             try
             {
-                int bytesReceived = client.Socket.EndReceive(result);
-                bool pushed = false;
+                int bytesRead = state.Item1.Socket.EndReceive(result);
+                state.Item2.PushReceivedData(bytesRead);
 
-                if (packetAssembler.BytesToRead == 0)
+                if (state.Item2.BytesToRead == 0)
                 {
-                    packetAssembler.PushReceivedData(bytesReceived);
-                    pushed = true;
-
-                    int streamDataLength = SerManager.GetLengthPrefix(packetAssembler.Data);
-
-                    if (streamDataLength > 0)
-                    {
-                        packetAssembler.BytesToRead = streamDataLength;
-                        packetAssembler.AllocateSpace(streamDataLength);
-                    }
+                    int messageLength = SerManager.GetLengthPrefix(state.Item2.LengthData);
+                    ReadMessage(state.Item1, messageLength, state.Item3);
                 }
-
-                if (bytesReceived > 0 && packetAssembler.BytesToRead > 0)
+                else
                 {
-                    if (!pushed)
-                    {
-                        packetAssembler.PushReceivedData(bytesReceived);
-                        pushed = true;
-                    }
-
-
-                    if (packetAssembler.BytesRead >= packetAssembler.BytesToRead)
-                    {
-                        // handle the client service
-                        List<Message> messages =
-                            SerManager.DeserializeWithLengthPrefix<List<Message>>(packetAssembler.Data);
-
-                        packetAssembler.Dispose();
-
-                        Parser.ParseReceived(client, messages[0]);
-                        return;
-                    }
+                    ContinueReadingLengthPrefix(state);
                 }
-
-                ContinueReceiveSingle(state);
             }
-            catch (Exception e)
+            catch
             {
-                ServiceHandler.TryLogout(client);
-
-                if (client != null)
-                {
-                    Writer.SendToThenDropConnection(client, new Message<string>(Service.None, Messages.InternalErrorDrop));
-                }
-
-                Console.WriteLine(e.ToString());
+                Console.WriteLine("Error while reading length prefix");
             }
         }
 
-        private static void ContinueReceive(Tuple<Client, PacketAssembler> state)
+        private static void ContinueReadingLengthPrefix(Tuple<Client, LengthReceiver, bool> state)
         {
             state.Item1.Socket.BeginReceive(
-                        state.Item2.DataBuffer,
-                        0,
-                        PacketAssembler.PacketSize,
-                        SocketFlags.None,
-                        ReceiveContinuousCallback,
-                        state);
-        }
-
-        private static void ContinueReceiveSingle(Tuple<Client, PacketAssembler> state)
-        {
-            state.Item1.Socket.BeginReceive(
-                        state.Item2.DataBuffer,
-                        0,
-                        PacketAssembler.PacketSize,
-                        SocketFlags.None,
-                        ReceiveSingleCallback,
-                        state);
+                state.Item2.Buffer,
+                0,
+                state.Item2.BytesToRead,
+                SocketFlags.None,
+                LengthPrefixReceivedCallback,
+                state);
         }
     }
 }

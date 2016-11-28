@@ -1,6 +1,5 @@
 ﻿namespace ModelDTOs
 {
-    using System;
     using ModelDTOs.Enums;
 
     using ProtoBuf;
@@ -9,6 +8,7 @@
     [ProtoInclude(10, typeof(Message<string>))]
     [ProtoInclude(20, typeof(Message<AuthDataRaw>))]
     [ProtoInclude(30, typeof(Message<PlayerDTO>))]
+    [ProtoInclude(40, typeof(Message<PlayerDTO[]>))]
     public abstract class Message
     {
         protected Message()
