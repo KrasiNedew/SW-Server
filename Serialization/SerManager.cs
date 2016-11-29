@@ -1,12 +1,49 @@
 ﻿namespace Serialization
 {
+    using System;
     using System.Collections.Generic;
     using System.IO;
 
     using ProtoBuf;
 
+    using Server.Wrappers;
+
     public static class SerManager
     {
+        /// <summary>   
+        /// Serializes any object to managed buffer from the Buffers static class. 
+        /// If there is no fitting buffer provided from the predefined buffers will throw.
+        /// </summary>
+        public static Tuple<byte[], int> SerializeToManagedBuffer<T>(T obj)
+        {
+            using (MemoryStream ms = new MemoryStream())
+            {
+                Serializer.Serialize(ms, obj);
+                byte[] buffer = Buffers.Take((int)ms.Length);
+                Array.Copy(ms.ToArray(), buffer, ms.Length);
+                return Tuple.Create(buffer, (int)ms.Length);
+            }
+        }
+
+        /// <summary>   
+        /// Serializes any object to managed buffer from the Buffers static class 
+        /// and encodes the length of the buffer in the first 5 bytes. 
+        /// If there is no fitting buffer provided from the predefined buffers will throw.
+        /// </summary>
+        public static Tuple<byte[], int> SerializeToManagedBufferPrefixed<T>(T obj)
+        {
+            using (MemoryStream ms = new MemoryStream())
+            {
+                ms.Seek(5, SeekOrigin.Begin);
+                Serializer.Serialize(ms, obj);
+                ms.Seek(0, SeekOrigin.Begin);
+                Serializer.Serialize(ms, ms.Length);
+                byte[] buffer = Buffers.Take((int)ms.Length);
+                Array.Copy(ms.ToArray(), buffer, ms.Length);
+                return Tuple.Create(buffer, (int)ms.Length);
+            }
+        }
+
         public static byte[] Serialize<T>(T obj)
         {
             using (MemoryStream ms = new MemoryStream())

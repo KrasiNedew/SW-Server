@@ -49,7 +49,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AuthDataSecure.cs" />
-    <Compile Include="BlockingCircularQueue.cs" />
+    <Compile Include="Buffers.cs" />
+    <Compile Include="Client.cs" />
+    <Compile Include="MessageReader.cs" />
+    <Compile Include="PrefixReader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

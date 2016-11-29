@@ -70,6 +70,10 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ServerUtils\ServerUtils.csproj">
+      <Project>{5b099471-2568-4e7c-a47d-f963229db4df}</Project>
+      <Name>ServerUtils</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Server\Server.csproj">
       <Project>{34be4e9a-c7c2-48bb-8afd-78c4d5c0f6b5}</Project>
       <Name>Server</Name>

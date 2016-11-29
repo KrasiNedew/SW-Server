@@ -2,11 +2,11 @@
 {
     using System;
 
-    public class PacketAssembler : IDisposable
+    public class MessageReader : IDisposable
     {
-        public PacketAssembler(int bytesToRead)
+        public MessageReader(int bytesToRead)
         {
-            this.DataBuffer = Buffers.TakeBuffer(bytesToRead);
+            this.DataBuffer = Buffers.Take(bytesToRead);
         }
 
         public bool Disposed { get; private set; }
@@ -15,7 +15,7 @@
 
         public void CleanDataBuffer()
         {
-            Buffers.ReturnBuffer(this.DataBuffer);
+            Buffers.Return(this.DataBuffer);
         }
 
         public void Dispose()

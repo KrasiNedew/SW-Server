@@ -32,7 +32,7 @@
         {
             if (client.Disposed) return;
 
-            PacketAssembler packetAssembler = new PacketAssembler(messageLength);
+            MessageReader packetAssembler = new MessageReader(messageLength);
 
             try
             {
@@ -52,8 +52,8 @@
 
         private static void MessageReceivedCallback(IAsyncResult result)
         {
-            Tuple<Client, PacketAssembler, bool> state =
-                result.AsyncState as Tuple<Client, PacketAssembler, bool>;
+            Tuple<Client, MessageReader, bool> state =
+                result.AsyncState as Tuple<Client, MessageReader, bool>;
             if (state == null || state.Item1.Disposed)
             {
                 state?.Item2.Dispose();
@@ -61,7 +61,7 @@
             }
 
             Client client = state.Item1;
-            PacketAssembler packetAssembler = state.Item2;
+            MessageReader packetAssembler = state.Item2;
             bool listenForNextMessage = state.Item3;
 
             try
@@ -102,27 +102,27 @@
         {
             if (client.Disposed) return;
 
-            LengthReceiver lengthReceiver = new LengthReceiver();
+            PrefixReader prefixReader = new PrefixReader();
 
             try
             {
                 client.Socket.BeginReceive(
-                    lengthReceiver.Buffer,
+                    prefixReader.Buffer,
                     0,
-                    LengthReceiver.LengthPrefixBytes,
+                    PrefixReader.PrefixBytes,
                     SocketFlags.None,
                     LengthPrefixReceivedCallback,
-                    Tuple.Create(client, lengthReceiver, continuous));
+                    Tuple.Create(client, prefixReader, continuous));
             }
             catch
             {
-                lengthReceiver.Dispose();
+                prefixReader.Dispose();
             }
         }
 
         private static void LengthPrefixReceivedCallback(IAsyncResult result)
         {
-            Tuple<Client, LengthReceiver, bool> state = (Tuple<Client, LengthReceiver, bool>)result.AsyncState;
+            Tuple<Client, PrefixReader, bool> state = (Tuple<Client, PrefixReader, bool>)result.AsyncState;
             if (state.Item1.Disposed)
             {
                 state.Item2.Dispose();
@@ -136,7 +136,7 @@
 
                 if (state.Item2.BytesToRead == 0)
                 {
-                    int messageLength = SerManager.GetLengthPrefix(state.Item2.LengthData) - LengthReceiver.LengthPrefixBytes;
+                    int messageLength = SerManager.GetLengthPrefix(state.Item2.PrefixData) - PrefixReader.PrefixBytes;
                     state.Item2.Dispose();
                     ReadMessage(state.Item1, messageLength, state.Item3);
                 }
@@ -152,7 +152,7 @@
             }
         }
 
-        private static void ContinueReadingLengthPrefix(Tuple<Client, LengthReceiver, bool> state)
+        private static void ContinueReadingLengthPrefix(Tuple<Client, PrefixReader, bool> state)
         {
             if (state.Item1.Disposed)
             {

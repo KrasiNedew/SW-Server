@@ -92,6 +92,7 @@
             {
                 Thread.Sleep(ConnectionCheckInterval);
                 int discClients = 0;
+                Console.WriteLine($"{Buffers.PrefixBuffers.Count} pb {Buffers.TinyBuffers.Count} tb {Buffers.SmallBuffers.Count} sb {Buffers.MediumBuffers.Count} mb {Buffers.LargeBuffers.Count} lb");
                 if (this.clients.Count == 0)
                 {
                     continue;

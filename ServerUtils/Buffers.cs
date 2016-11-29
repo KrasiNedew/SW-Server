@@ -8,6 +8,8 @@
  
     public static class Buffers
     {
+        private const int NumberOfPrefixBuffers = 5000;
+
         private const int NumberOfTinyBuffers = 5000;
 
         private const int NumberOfSmallBuffers = 5000;
@@ -15,8 +17,6 @@
         private const int NumberOfMediumBuffers = 2000;
 
         private const int NumberOfLargeBuffers = 200;
-
-        private const int NumberOfLengthBuffers = 5000;
 
         private const int TinyBufferSize = 256;
 
@@ -26,29 +26,29 @@
 
         private const int LargeBufferSize = 524288;
 
-        private static Stack<byte[]> TinyBuffers;
+        public static Stack<byte[]> PrefixBuffers;
 
-        private static Stack<byte[]> SmallBuffers;
+        public static Stack<byte[]> TinyBuffers;
 
-        private static Stack<byte[]> MediumBuffers; 
+        public static Stack<byte[]> SmallBuffers;
 
-        private static Stack<byte[]> LargeBuffers;
+        public static Stack<byte[]> MediumBuffers;
 
-        private static Stack<byte[]> LengthBuffers;
+        public static Stack<byte[]> LargeBuffers;
 
-        private static BlockingCollection<byte[]> BuffersClearance; 
+        public static BlockingCollection<byte[]> BuffersClearance; 
 
         public static void Init()
         {
-            LengthBuffers = new Stack<byte[]>(NumberOfLengthBuffers);
+            PrefixBuffers = new Stack<byte[]>(NumberOfPrefixBuffers);
             TinyBuffers = new Stack<byte[]>(NumberOfTinyBuffers);
             SmallBuffers = new Stack<byte[]>(NumberOfSmallBuffers);
             MediumBuffers = new Stack<byte[]>(NumberOfMediumBuffers);
             LargeBuffers = new Stack<byte[]>(NumberOfLargeBuffers);
 
-            for (int i = 0; i < NumberOfLengthBuffers; i++)
+            for (int i = 0; i < NumberOfPrefixBuffers; i++)
             {
-                LengthBuffers.Push(new byte[LengthReceiver.LengthPrefixBytes]);
+                PrefixBuffers.Push(new byte[PrefixReader.PrefixBytes]);
             }
 
             for (int i = 0; i < NumberOfTinyBuffers; i++)
@@ -73,14 +73,14 @@
 
             BuffersClearance = new BlockingCollection<byte[]>();
 
-            Task.Run(() => { BuffersCleaner(); });
+            Task.Run(() => { Cleaner(); });
         }
 
-        public static byte[] TakeBuffer(int size)
+        public static byte[] Take(int size)
         {
-            if (size <= LengthReceiver.LengthPrefixBytes)
+            if (size <= PrefixReader.PrefixBytes)
             {
-                return LengthBuffers.Pop();
+                return PrefixBuffers.Pop();
             }
 
             if (size <= TinyBufferSize)
@@ -106,12 +106,17 @@
             throw new InsufficientMemoryException("The requested buffer is too large");
         }
 
-        public static void ReturnBuffer(byte[] buffer)
+        public static void Return(byte[] buffer)
         {
+            if (buffer == null || buffer.Length > LargeBufferSize)
+            {
+                return;
+            }
+
             BuffersClearance.Add(buffer);
         }
 
-        private static void BuffersCleaner()
+        private static void Cleaner()
         {
             byte[] buffer;
             bool available;
@@ -123,8 +128,8 @@
                     Array.Clear(buffer, 0, buffer.Length);
                     switch (buffer.Length)
                     {
-                        case LengthReceiver.LengthPrefixBytes:
-                            LengthBuffers.Push(buffer);
+                        case PrefixReader.PrefixBytes:
+                            PrefixBuffers.Push(buffer);
                             break;
                         case TinyBufferSize:
                             TinyBuffers.Push(buffer);

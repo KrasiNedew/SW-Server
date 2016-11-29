@@ -19,6 +19,7 @@
         {
             if (client.Disposed) return;
 
+            Tuple<byte[], int> data = null;
             try
             {
                 if (!client.Validated && !(message is Message<string>))
@@ -26,15 +27,19 @@
                     throw new InvalidOperationException("Cannot send data to non validated clients");
                 }
 
-                byte[] dataBytes = SerManager.SerializeWithLengthPrefix(message);
-                Message check = SerManager.DeserializeWithLengthPrefix<Message>(dataBytes);
-                Console.WriteLine(check.Service);
+                data = SerManager.SerializeToManagedBufferPrefixed(message);
 
-                if (client.Disposed) return;
-                client.Socket.BeginSend(dataBytes, 0, dataBytes.Length, SocketFlags.None, SendToCallback, client);
+                if (client.Disposed)
+                {
+                    Buffers.Return(data.Item1);
+                    return;
+                }
+
+                client.Socket.BeginSend(data.Item1, 0, data.Item2, SocketFlags.None, SendToCallback, Tuple.Create(client, data.Item1));
             }
             catch (Exception e)
             {
+                Buffers.Return(data?.Item1);
                 Console.WriteLine(e.ToString());
             }
         }
@@ -43,17 +48,25 @@
         {
             if (client.Disposed) return;
 
+            Tuple<byte[], int> data = null;
             try
             {
-                byte[] dataBytes = SerManager.SerializeWithLengthPrefix(message);
+                data = SerManager.SerializeToManagedBufferPrefixed(message);
+                if (client.Disposed)
+                {
+                    Buffers.Return(data.Item1);
+                    return;
+                }
 
-                client.Socket.Send(dataBytes);
+                client.Socket.Send(data.Item1, 0, data.Item2, SocketFlags.None);
 
                 AuthenticationServices.TryLogout(client);
                 client.Dispose();
+                Buffers.Return(data.Item1);
             }
             catch (Exception e)
             {
+                Buffers.Return(data?.Item1);
                 AuthenticationServices.TryLogout(client);
                 client.Dispose();
                 Console.WriteLine(e.ToString());
@@ -134,17 +147,23 @@
 
         private static void SendToCallback(IAsyncResult result)
         {
+            Tuple<Client, byte[]> state = (Tuple<Client, byte[]>)result.AsyncState;
+            
             try
             {
-                Client client = (Client)result.AsyncState;
-                if (client.Disposed) return;
+                if (state.Item1.Disposed)
+                {
+                    Buffers.Return(state.Item2);
+                    return;
+                }
 
-                int bytesSent = client.Socket.EndSend(result);
-
-                Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, client.AuthData?.Username);
+                int bytesSent = state.Item1.Socket.EndSend(result);
+                Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, state.Item1.AuthData?.Username);
+                Buffers.Return(state.Item2);                
             }
             catch (Exception e)
             {
+                Buffers.Return(state.Item2);
                 Console.WriteLine(e.ToString());
             }
         }
