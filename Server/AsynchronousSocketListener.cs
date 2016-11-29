@@ -99,21 +99,7 @@
 
                 try
                 {
-                    foreach (var client in this.clients)
-                    {
-                        if (!client.Disposed)
-                        {
-                            client.Connected = client.IsConnected();
-                        }
-                    }
-                }
-                catch
-                {
-                }
-
-                try
-                {
-                    var disconnectedClients = this.clients.Where(client => !client.Connected || client.Disposed);
+                    var disconnectedClients = this.clients.Where(client => !client.IsConnected() || client.Disposed);
 
                     foreach (var discClient in disconnectedClients)
                     {
@@ -164,6 +150,7 @@
         {
             foreach (var client in this.clients)
             {
+                AuthenticationServices.TryLogout(client);
                 client.Dispose();
                 this.listener.Close();
                 this.listener.Dispose();

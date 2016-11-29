@@ -1,7 +1,6 @@
 ﻿namespace Server.Wrappers
 {
     using System;
-    using System.Collections.Generic;
 
     public class PacketAssembler : IDisposable
     {
@@ -10,7 +9,9 @@
             this.DataBuffer = Buffers.TakeBuffer(bytesToRead);
         }
 
-        public byte[] DataBuffer { get; private set; }
+        public bool Disposed { get; private set; }
+
+        public byte[] DataBuffer { get; }
 
         public void CleanDataBuffer()
         {
@@ -19,7 +20,10 @@
 
         public void Dispose()
         {
+            if (this.Disposed) return;
+
             this.CleanDataBuffer();
+            this.Disposed = true;
         }
     }
 }

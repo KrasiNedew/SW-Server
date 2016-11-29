@@ -17,6 +17,8 @@
     {
         public static void SendTo(Client client, Message message)
         {
+            if (client.Disposed) return;
+
             try
             {
                 if (!client.Validated && !(message is Message<string>))
@@ -27,6 +29,8 @@
                 byte[] dataBytes = SerManager.SerializeWithLengthPrefix(message);
                 Message check = SerManager.DeserializeWithLengthPrefix<Message>(dataBytes);
                 Console.WriteLine(check.Service);
+
+                if (client.Disposed) return;
                 client.Socket.BeginSend(dataBytes, 0, dataBytes.Length, SocketFlags.None, SendToCallback, client);
             }
             catch (Exception e)
@@ -37,14 +41,13 @@
 
         public static void SendToThenDropConnection(Client client, Message message)
         {
+            if (client.Disposed) return;
+
             try
             {
-                if (client.Socket.Connected)
-                {
-                    byte[] dataBytes = SerManager.SerializeWithLengthPrefix(message);
+                byte[] dataBytes = SerManager.SerializeWithLengthPrefix(message);
 
-                    client.Socket.Send(dataBytes);
-                }
+                client.Socket.Send(dataBytes);
 
                 AuthenticationServices.TryLogout(client);
                 client.Dispose();
@@ -52,7 +55,7 @@
             catch (Exception e)
             {
                 AuthenticationServices.TryLogout(client);
-                client?.Dispose();
+                client.Dispose();
                 Console.WriteLine(e.ToString());
             }
         }
@@ -67,6 +70,7 @@
                     {
                         try
                         {
+                            if(client.Disposed) continue;
                             SendTo(client, message);
                         }
                         catch (Exception e)
@@ -85,6 +89,8 @@
 
         public static void Send(Client sender, Message message, params Client[] receivers)
         {
+            if (sender.Disposed) return;
+
             Task.Run(() =>
             {
                 Message<string> senderUsername = new Message<string>(Service.SenderUsername, sender.AuthData.Username);
@@ -106,6 +112,7 @@
                             {
                                 try
                                 {
+                                    if(client.Disposed) continue;
                                     SendTo(client, senderUsername);
                                     SendTo(client, message);
                                 }
@@ -130,6 +137,7 @@
             try
             {
                 Client client = (Client)result.AsyncState;
+                if (client.Disposed) return;
 
                 int bytesSent = client.Socket.EndSend(result);
 

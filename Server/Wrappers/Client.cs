@@ -1,6 +1,7 @@
 ﻿namespace Server.Wrappers
 {
     using System;
+    using System.Collections.Concurrent;
     using System.Net.Sockets;
 
     using ServerUtils;
@@ -15,14 +16,14 @@
 
         public bool Validated { get; set; }
 
-        public bool Connected { get; set; }
-
         public bool Disposed { get; set; }
 
         public bool IsConnected()
         {
             try
             {
+                if (this.Disposed) return false;
+
                 int sent = this.Socket.Send(PingByte);
                 return sent > 0;
             }
@@ -40,6 +41,8 @@
 
         public void Dispose()
         {
+            if (this.Disposed) return;
+
             this.Socket.Close();
             this.Socket.Dispose();
             this.Disposed = true;

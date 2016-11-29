@@ -5,13 +5,15 @@
     {
         public const int LengthPrefixBytes = 5;
 
-        public byte[] Buffer { get; set; }
+        public byte[] Buffer { get; private set; }
 
-        public byte[] LengthData { get; set; }
+        public byte[] LengthData { get; private set; }
 
         public int BytesRead { get; set; }
 
         public int BytesToRead => LengthPrefixBytes - this.BytesRead;
+
+        public bool Disposed { get; set; }
 
         public LengthReceiver()
         {
@@ -47,8 +49,11 @@
 
         public void Dispose()
         {
+            if (this.Disposed) return;
+
             Buffers.ReturnBuffer(this.Buffer);
             Buffers.ReturnBuffer(this.LengthData);
+            this.Disposed = true;
         }
     }
 }
