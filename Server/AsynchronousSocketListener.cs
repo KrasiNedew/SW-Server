@@ -12,10 +12,11 @@
 
     using Serialization;
 
+    using Server.CommHandlers;
     using Server.Constants;
-    using Server.Handlers;
     using Server.Services;
-    using Server.Wrappers;
+
+    using ServerUtils;
 
     public class AsynchronousSocketListener : IDisposable
     {
@@ -87,14 +88,14 @@
             IPEndPoint ip = (IPEndPoint)client.Socket.RemoteEndPoint;
             if (this.blocked.ContainsKey(ip.Address.ToString()))
             {
-                this.SendBlockedMessage(client, this.blocked[ip.Address.ToString()]);
+                Responses.Blocked(client, this.blocked[ip.Address.ToString()]);
                 return;
             }
 
 
             if (this.clients.Count >= MaxNumberOfConcurrentConnections)
             {
-                Writer.SendTo(client, new Message<string>(Service.Info, Messages.ConnectionLimitReached));
+                Writer.SendTo(client, new Message<string>(Service.Info, MessageText.ConnectionLimitReached));
                 return;
             }
 
@@ -165,30 +166,12 @@
                     this.blocked.Add(ip, DateTime.Now);
                 }
 
-                this.SendBlockedMessage(client, DateTime.Now);
+                Responses.Blocked(client, this.blocked[ip]);
             }
             finally
             {
                 client.Dispose();
                 this.clients.Remove(client);
-            }
-        }
-
-        private void SendBlockedMessage(Client client, DateTime timeOfBlock)
-        {
-            TimeSpan diff = new TimeSpan(DateTime.Now.Ticks - timeOfBlock.Ticks);
-            Message<string> message = 
-                new Message<string>(Service.Info, $"You are blocked. Try again in {diff.Minutes} min : {diff.Seconds} sec");
-
-            Tuple<byte[], int> data = SerManager.SerializeToManagedBufferPrefixed(message);
-            try
-            {
-                client.Socket.Send(data.Item1, 0, data.Item2, SocketFlags.None);
-            }
-            finally
-            {
-                Buffers.Return(data.Item1);
-                client.Dispose();
             }
         }
 

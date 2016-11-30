@@ -1,32 +1,60 @@
 ﻿namespace Server.Constants
 {
+    using ModelDTOs;
+
     public static class Messages
     {
-        public const string InternalErrorDrop = "Internal Error. Dropping you connection";
+        public static readonly Message<string> InternalError = 
+            Message.Create(MessageText.InternalErrorDrop);
 
-        // #besterrorresponse
-        public const string SomethingWentWrong = "Oops something went wrong";
+        public static readonly Message<string> InvalidCredentials = 
+            Message.Create(MessageText.InvalidCredentials);
 
-        public const string LoginSuccess = "Logged in successfuly";
+        public static readonly Message<string> SomethingWentWrong = 
+            Message.Create(MessageText.SomethingWentWrong);
 
-        public const string InvalidCredentials = "Invalid credentials";
+        public static readonly Message<string> AlreadyLoggedIn =
+            Message.Create(MessageText.AlreadyLoggedIn);
 
-        public const string AlreadyLoggedIn = "You are already logged in";
+        public static readonly Message<string> PlayerAlreadyLoggedIn = 
+            Message.Create(MessageText.PlayerAlreadyLoggedIn);
 
-        public const string PlayerAlreadyLoggedIn = "Player is already logged in.";
+        public static readonly Message<string> EmptyUsername = 
+            Message.Create(MessageText.EmptyUsername);
 
-        public const string EmptyUsername = "Username cannot be empty";
+        public static readonly Message<string> EmptyPassword = 
+            Message.Create(MessageText.EmptyPassword);
 
-        public const string EmptyPassword = "Password cannot be empty";
+        public static readonly Message<string> UsernameTaken = 
+            Message.Create(MessageText.UsernameTaken);
 
-        public const string UsernameTaken = "Username already taken";
+        public static readonly Message<string> RegisterSuccessful = 
+            Message.Create(MessageText.RegisterSuccessful);
 
-        public const string RegisterSuccessful = "Registered successfuly";
+        public static readonly Message<string> LoginSuccessful =
+            Message.Create(MessageText.LoginSuccess);
 
-        public const string LogoutSuccess = "Logged out successfuly";
+        public static readonly Message<string> LogoutSuccess =
+            Message.Create(MessageText.LogoutSuccess);
 
-        public const string DataNotSaved = "An error occured while saving your data.";
+        public static readonly Message<string> ServiceNotRecognized =
+            Message.Create(MessageText.ServiceNotRecognized);
 
-        public const string ConnectionLimitReached = "Server is busy. Try again later later.";
+        public static readonly Message<string> ConnectionLimitReached =
+            Message.Create(MessageText.ConnectionLimitReached);
+
+        public static readonly Message<string> DataNotSaved =
+            Message.Create(MessageText.DataNotSaved);
+
+        public static readonly Message<string> DataSaved =
+            Message.Create(MessageText.DataSaved);
+
+        public static readonly Message<string> MustLoginFirst = 
+            Message.Create(MessageText.MustBeLoggedIn);
+        
+        // 1 bit of data to indicate success or failure of action
+        public static readonly Message<bool> Success = Message.Create(true);
+
+        public static readonly Message<bool> Error = Message.Create(false);
     }
 }

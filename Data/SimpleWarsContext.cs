@@ -26,10 +26,4 @@ namespace Data
 
         public virtual DbSet<ResourceDTO> Resources { get; set; }
     }
-
-    //public class MyEntity
-    //{
-    //    public int Id { get; set; }
-    //    public string Name { get; set; }
-    //}
 }

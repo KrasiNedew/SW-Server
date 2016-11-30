@@ -5,33 +5,41 @@
 
     using Data;
     using System.Data.Entity;
-    using System.Threading.Tasks;
 
     using ModelDTOs;
-    using ModelDTOs.Entities;
     using ModelDTOs.Enums;
 
-    using Server.Constants;
-    using Server.Handlers;
-    using Server.Wrappers;
+    using Server.CommHandlers;
 
     using ServerUtils;
 
     public static class AuthenticationServices
     {
-        private static readonly UsersManager Users = new UsersManager();
+        public static readonly UsersManager Users = new UsersManager();
 
         private static readonly Random Random = new Random();
 
-        public static int Login(Client client)
-        {            
-            if (client.User == null) return -1;
+        public static void Login(Client client)
+        {
+            if (client.User == null)
+            {
+                Responses.SomethingWentWrong(client);
+                return;
+            }
 
-            // double hash for users that somehow managed to send raw password (which means they are corrupt anyway)
+            // double hash for users that somehow managed to send raw password (which means they are corrupt/modified but whatever)
             client.User.PasswordHash = Hash.Generate(client.User.PasswordHash);
-            if (!Users.Exists(client.User)) return ErrorCodes.InvalidCredentialsError;
+            if (!Users.Exists(client.User))
+            {
+                Responses.InvalidCredentials(client);
+                return;
+            }
 
-            if (Users.IsLoggedIn(client.User)) return ErrorCodes.AlreadyLoggedIn;
+            if (Users.IsLoggedIn(client.User))
+            {
+                Responses.AlreadyLoggedIn(client);
+                return;
+            }
 
             Users.MarkLogin(client.User);
             client.User = Users.GetUser(client.User);
@@ -45,7 +53,8 @@
 
                 if (player == null)
                 {
-                    return ErrorCodes.InternalError;
+                    Responses.InternalError(client);
+                    return;
                 }
 
                 player.LoggedIn = true;
@@ -55,7 +64,7 @@
                 Console.WriteLine($"Client {client.User.Username} logged in");
             }
 
-            return 0;
+            Responses.LoginSuccess(client);
         }
 
         public static void TryLogout(Client client)
@@ -80,6 +89,7 @@
 
                     player.LoggedIn = false;
                     context.SaveChanges();
+                    Console.WriteLine($"Client {client.User.Username} logged out");
                 }
             }
             catch
@@ -87,11 +97,12 @@
             }
         }
 
-        public static int Logout(Client client)
+        public static void Logout(Client client)
         {
             if (client.User == null || !Users.IsLoggedIn(client.User) || client.User.Id == 0)
             {
-                return ErrorCodes.LogoutError;
+                Responses.MustBeLoggedIn(client);
+                return;
             }
 
             Users.MarkLogout(client.User);
@@ -102,24 +113,31 @@
 
                 if (player == null)
                 {
-                    return ErrorCodes.InternalError;
+                    Responses.InternalError(client);
+                    return;
                 }
 
                 player.LoggedIn = false;
                 context.SaveChanges();
+                Console.WriteLine($"Client {client.User.Username} logged out");
             }
 
-            return 0;
+            Responses.LogoutSuccess(client);
         }
 
-        public static int Register(Client client)
+        public static void Register(Client client)
         {
-            if (client.User == null) return -1;
+            if (client.User == null)
+            {
+                Responses.SomethingWentWrong(client);
+                return;
+            }
 
             client.User.PasswordHash = Hash.Generate(client.User.PasswordHash);
             if (client.User.LoggedIn || Users.IsLoggedIn(client.User))
             {
-                return ErrorCodes.AlreadyLoggedIn;
+                Responses.AlreadyLoggedIn(client);
+                return;
             }
 
             client.User.LoggedIn = true;
@@ -127,19 +145,22 @@
             if (string.IsNullOrWhiteSpace(client.User.Username))
             {
                 client.User.LoggedIn = false;
-                return ErrorCodes.UsernameEmptyError;
+                Responses.UsernameEmpty(client);
+                return;
             }
 
             if (string.IsNullOrWhiteSpace(client.User.PasswordHash))
             {
                 client.User.LoggedIn = false;
-                return ErrorCodes.PasswordEmptyError;
+                Responses.PasswordEmpty(client);
+                return;
             }
 
-            if (Users.Exists(client.User))
+            if (Users.GetAll().Any(u => u.Username == client.User.Username))
             {
                 client.User.LoggedIn = false;
-                return ErrorCodes.UsernameTakenError;
+                Responses.UsernameTaken(client);
+                return;
             }
 
             using (SimpleWarsContext context = new SimpleWarsContext())
@@ -155,9 +176,10 @@
                 Users.MarkRegister(client.User);
 
                 Writer.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
+                Console.WriteLine($"Client {client.User.Username} registered");
             }
 
-            return 0;
+            Responses.RegisterSuccess(client);
         }
 
         public static void LogoutAllUsers()
@@ -173,6 +195,8 @@
 
                     context.SaveChanges();
                 }
+
+                Console.WriteLine("All users logged out. Server shutting down.");
             }
         }
     }

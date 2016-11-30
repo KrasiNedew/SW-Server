@@ -1,4 +1,4 @@
-﻿namespace Server.Wrappers
+﻿namespace ServerUtils
 {
     using System;
 

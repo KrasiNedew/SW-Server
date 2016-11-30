@@ -1,4 +1,4 @@
-﻿namespace Server.Handlers
+﻿namespace Server.CommHandlers
 {
     using System;
     using System.Collections.Generic;
@@ -11,7 +11,8 @@
     using Serialization;
 
     using Server.Services;
-    using Server.Wrappers;
+
+    using ServerUtils;
 
     public static class Writer
     {
@@ -116,10 +117,7 @@
                     {
                         case Service.PlayerData:
                             var playerDto = (message as Message<PlayerDTO>)?.Data;
-                            if (playerDto == null)
-                            {
-                                return;
-                            }
+                            if (playerDto == null) return;
 
                             playerDto.PasswordHash = "";
 

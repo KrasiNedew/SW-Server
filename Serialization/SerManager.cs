@@ -6,7 +6,7 @@
 
     using ProtoBuf;
 
-    using Server.Wrappers;
+    using ServerUtils;
 
     public static class SerManager
     {

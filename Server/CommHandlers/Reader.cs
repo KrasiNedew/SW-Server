@@ -1,4 +1,4 @@
-﻿namespace Server.Handlers
+﻿namespace Server.CommHandlers
 {
     using System;
     using System.Net.Sockets;
@@ -10,7 +10,8 @@
 
     using Server.Constants;
     using Server.Services;
-    using Server.Wrappers;
+
+    using ServerUtils;
 
     public static class Reader
     {
@@ -93,7 +94,7 @@
 
                 if (client != null)
                 {
-                    Writer.SendToThenDropConnection(client, new Message<string>(Service.None, Messages.InternalErrorDrop));
+                    Writer.SendToThenDropConnection(client, new Message<string>(Service.None, MessageText.InternalErrorDrop));
                 }
 
                 Console.WriteLine(e.ToString());

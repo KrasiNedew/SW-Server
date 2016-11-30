@@ -1,12 +1,9 @@
-﻿namespace Server.Wrappers
+﻿namespace ServerUtils
 {
     using System;
-    using System.Collections.Concurrent;
     using System.Net.Sockets;
 
     using ModelDTOs;
-
-    using ServerUtils;
 
     public class Client : IDisposable
     {

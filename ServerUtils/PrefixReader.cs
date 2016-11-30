@@ -1,6 +1,7 @@
-﻿namespace Server.Wrappers
+﻿namespace ServerUtils
 {
     using System;
+
     public class PrefixReader : IDisposable
     {
         public const int PrefixBytes = 5;

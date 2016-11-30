@@ -5,10 +5,12 @@
 
     using ModelDTOs.Entities;
     using ModelDTOs.Enums;
+    using ModelDTOs.Resources;
 
     using ProtoBuf;
 
     [ProtoContract]
+    [ProtoInclude(7, typeof(Message<bool>))]
     [ProtoInclude(10, typeof(Message<string>))]
     [ProtoInclude(20, typeof(Message<UserFull>))]
     [ProtoInclude(50, typeof(Message<ICollection<UserLimited>>))]
@@ -18,7 +20,7 @@
     [ProtoInclude(80, typeof(Message<ICollection<ResourceProviderDTO>>))]
     [ProtoInclude(70, typeof(Message<UnitDTO>))]
     [ProtoInclude(90, typeof(Message<ICollection<UnitDTO>>))]
-    [ProtoInclude(100, typeof(Message<ResourceSet>))]
+    [ProtoInclude(100, typeof(Message<ResourceSetDTO>))]
     public abstract class Message
     {
         protected Message()
@@ -32,6 +34,16 @@
 
         [ProtoMember(1)]
         public Service Service { get; set; }
+
+        public static Message<T> Create<T>(Service service, T data)
+        {
+            return new Message<T>(service, data);
+        }
+
+        public static Message<T> Create<T>(T data, Service service = Service.Info)
+        {
+            return new Message<T>(service, data);
+        }
     }
 
     [ProtoContract]
