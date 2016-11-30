@@ -19,7 +19,7 @@
 
     public class AsynchronousSocketListener : IDisposable
     {
-        private const int ConnectionCheckInterval = 6000;
+        private const int ConnectionCheckInterval = 10000;
 
         private const int MaxNumberOfConcurrentConnections = 3000;
 
@@ -114,10 +114,17 @@
                 if (this.clients.Count == 0)
                 {
                     continue;
-                }
+                }             
 
                 try
                 {
+                    ICollection<string> unblocked = (from ip in this.blocked.Keys let diff = new TimeSpan(DateTime.Now.Ticks - this.blocked[ip].Ticks) where diff.Minutes > 10 select ip).ToList();
+
+                    foreach (var ip in unblocked)
+                    {
+                        this.blocked.Remove(ip);
+                    }
+
                     var badClients = this.clients.Where(client => !client.IsConnected() || client.Disposed || client.ErrorsAccumulated > 10);
 
                     foreach (var badClient in badClients)
