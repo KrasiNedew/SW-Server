@@ -15,27 +15,28 @@
             switch (message.Service)
             {
                 case Service.None:
-                    Writer.SendToThenDropConnection(client, new Message<string>(Service.Login, Messages.InternalErrorDrop));
+                    Writer.SendToThenDropConnection(client, new Message<string>(Service.Info, Messages.InternalErrorDrop));
                     return;
                 case Service.Login:
                     UserFull loginData = ((Message<UserFull>)message).Data;
+                    client.User = loginData;
+                    err = AuthenticationServices.Login(client);
 
-                    err = AuthenticationServices.Login(client, loginData);
                     switch (err)
                     {
                         case 0:
-                            Writer.SendTo(client, new Message<string>(Service.Login, Messages.LoginSuccess));
+                            Writer.SendTo(client, new Message<string>(Service.Info, Messages.LoginSuccess));
                             break;
                         case ErrorCodes.InvalidCredentialsError:
-                            Writer.SendTo(client, new Message<string>(Service.Login, Messages.InvalidCredentials));
+                            Writer.SendTo(client, new Message<string>(Service.Info, Messages.InvalidCredentials));
                             break;
                         case ErrorCodes.AlreadyLoggedIn:
                             Writer.SendTo(
-                                client, new Message<string>(Service.Login, Messages.PlayerAlreadyLoggedIn));
+                                client, new Message<string>(Service.Info, Messages.PlayerAlreadyLoggedIn));
                             break;
                         default:
                             Writer.SendToThenDropConnection(
-                                client, new Message<string>(Service.None, Messages.InternalErrorDrop));
+                                client, new Message<string>(Service.Info, Messages.InternalErrorDrop));
                             return;
                     }
 
@@ -47,16 +48,16 @@
                     {
                         case 0:
                             Writer.SendTo(client,
-                                new Message<string>(Service.Logout, Messages.LogoutSuccess));
+                                new Message<string>(Service.Info, Messages.LogoutSuccess));
                             break;
                         case ErrorCodes.LogoutError:
                             Writer.SendTo(client, new Message<string>
-                                (Service.Logout, Messages.DataNotSaved));
+                                (Service.Info, Messages.DataNotSaved));
                             break;
                         default:
                             Writer.SendToThenDropConnection(
                                 client, new Message<string>
-                                (Service.Logout, Messages.InternalErrorDrop));
+                                (Service.Info, Messages.InternalErrorDrop));
                             return;
                     }
 
@@ -79,32 +80,32 @@
                         case 0:
                             Writer.SendTo(
                             client,
-                            new Message<string>(Service.Registration, Messages.RegisterSuccessful));
+                            new Message<string>(Service.Info, Messages.RegisterSuccessful));
                             break;
                         case ErrorCodes.AlreadyLoggedIn:
                             Writer.SendTo(
                             client,
-                            new Message<string>(Service.Registration, Messages.AlreadyLoggedIn));
+                            new Message<string>(Service.Info, Messages.AlreadyLoggedIn));
                             break;
                         case ErrorCodes.UsernameEmptyError:
                             Writer.SendTo(
                             client,
-                            new Message<string>(Service.Registration, Messages.EmptyUsername));
+                            new Message<string>(Service.Info, Messages.EmptyUsername));
                             break;
                         case ErrorCodes.PasswordEmptyError:
                             Writer.SendTo(
                             client,
-                            new Message<string>(Service.Registration, Messages.EmptyPassword));
+                            new Message<string>(Service.Info, Messages.EmptyPassword));
                             break;
                         case ErrorCodes.UsernameTakenError:
                             Writer.SendTo(
                             client,
-                            new Message<string>(Service.Registration, Messages.UsernameTaken));
+                            new Message<string>(Service.Info, Messages.UsernameTaken));
                             break;
                         default:
                             Writer.SendToThenDropConnection(
                             client,
-                            new Message<string>(Service.Registration, Messages.InternalErrorDrop));
+                            new Message<string>(Service.Info, Messages.InternalErrorDrop));
                             return;
                     }
 

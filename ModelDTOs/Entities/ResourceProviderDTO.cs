@@ -1,12 +1,14 @@
 ﻿namespace ModelDTOs.Entities
 {
     using System;
+    using System.ComponentModel.DataAnnotations.Schema;
 
     using ModelDTOs.Resources;
 
     using ProtoBuf;
 
     [ProtoContract]
+    [Table("ResourceProviders")]
     public class ResourceProviderDTO : EntityDTO
     {
         protected ResourceProviderDTO()

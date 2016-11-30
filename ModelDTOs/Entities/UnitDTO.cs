@@ -1,10 +1,12 @@
 ﻿namespace ModelDTOs.Entities
 {
     using System;
+    using System.ComponentModel.DataAnnotations.Schema;
 
     using ProtoBuf;
 
     [ProtoContract]
+    [Table("Units")]
     public class UnitDTO : EntityDTO
     {
         protected UnitDTO()

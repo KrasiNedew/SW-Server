@@ -1,6 +1,7 @@
 ﻿namespace ModelDTOs
 {
     using System.Collections.Generic;
+    using System.ComponentModel.DataAnnotations.Schema;
 
     using ModelDTOs.Entities;
     using ModelDTOs.Resources;
@@ -8,6 +9,7 @@
     using ProtoBuf;
 
     [ProtoContract]
+    [Table("Players")]
     public class PlayerDTO
     {
         protected PlayerDTO()

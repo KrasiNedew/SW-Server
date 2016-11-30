@@ -1,8 +1,11 @@
 ﻿namespace ModelDTOs.Resources
 {
+    using System.ComponentModel.DataAnnotations.Schema;
+
     using ProtoBuf;
 
     [ProtoContract]
+    [Table("Resources")]
     public class ResourceDTO
     {
         protected ResourceDTO()

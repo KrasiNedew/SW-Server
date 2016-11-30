@@ -118,7 +118,11 @@
 
                 try
                 {
-                    ICollection<string> unblocked = (from ip in this.blocked.Keys let diff = new TimeSpan(DateTime.Now.Ticks - this.blocked[ip].Ticks) where diff.Minutes > 10 select ip).ToList();
+                    ICollection<string> unblocked = 
+                        (from ip in this.blocked.Keys
+                        let diff = 
+                        new TimeSpan(DateTime.Now.Ticks - this.blocked[ip].Ticks)
+                        where diff.Minutes > 10 select ip).ToList();
 
                     foreach (var ip in unblocked)
                     {

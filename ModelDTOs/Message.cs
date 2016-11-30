@@ -1,7 +1,9 @@
 ﻿namespace ModelDTOs
 {
     using System.Collections.Generic;
+    using System.Resources;
 
+    using ModelDTOs.Entities;
     using ModelDTOs.Enums;
 
     using ProtoBuf;
@@ -12,6 +14,11 @@
     [ProtoInclude(50, typeof(Message<ICollection<UserLimited>>))]
     [ProtoInclude(30, typeof(Message<PlayerDTO>))]
     [ProtoInclude(40, typeof(Message<ICollection<PlayerDTO>>))]
+    [ProtoInclude(60, typeof(Message<ResourceProviderDTO>))]
+    [ProtoInclude(80, typeof(Message<ICollection<ResourceProviderDTO>>))]
+    [ProtoInclude(70, typeof(Message<UnitDTO>))]
+    [ProtoInclude(90, typeof(Message<ICollection<UnitDTO>>))]
+    [ProtoInclude(100, typeof(Message<ResourceSet>))]
     public abstract class Message
     {
         protected Message()

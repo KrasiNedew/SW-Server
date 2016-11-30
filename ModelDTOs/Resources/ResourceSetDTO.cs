@@ -8,6 +8,7 @@
     using ProtoBuf;
 
     [ProtoContract]
+    [Table("ResourceSets")]
     public class ResourceSetDTO
     {
         protected ResourceSetDTO()

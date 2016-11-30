@@ -23,14 +23,18 @@
 
         private static readonly Random Random = new Random();
 
-        public static int Login(Client client, UserFull user)
-        {
-            if (!Users.Exists(user)) return ErrorCodes.InvalidCredentialsError;
+        public static int Login(Client client)
+        {            
+            if (client.User == null) return -1;
 
-            if (Users.IsLoggedIn(user)) return ErrorCodes.AlreadyLoggedIn;
+            // double hash for users that somehow managed to send raw password (which means they are corrupt anyway)
+            client.User.PasswordHash = Hash.Generate(client.User.PasswordHash);
+            if (!Users.Exists(client.User)) return ErrorCodes.InvalidCredentialsError;
 
-            Users.MarkLogin(user);
-            client.User = Users.GetUser(user);
+            if (Users.IsLoggedIn(client.User)) return ErrorCodes.AlreadyLoggedIn;
+
+            Users.MarkLogin(client.User);
+            client.User = Users.GetUser(client.User);
 
             using (SimpleWarsContext context = new SimpleWarsContext())
             {
@@ -112,6 +116,7 @@
         {
             if (client.User == null) return -1;
 
+            client.User.PasswordHash = Hash.Generate(client.User.PasswordHash);
             if (client.User.LoggedIn || Users.IsLoggedIn(client.User))
             {
                 return ErrorCodes.AlreadyLoggedIn;
