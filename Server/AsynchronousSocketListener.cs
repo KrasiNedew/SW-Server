@@ -9,6 +9,9 @@
     using System.Threading.Tasks;
     using ModelDTOs;
     using ModelDTOs.Enums;
+
+    using Serialization;
+
     using Server.Constants;
     using Server.Handlers;
     using Server.Services;
@@ -27,12 +30,15 @@
 
         private readonly HashSet<Client> clients;
 
+        private readonly Dictionary<string, DateTime> blocked;
+
         private readonly Socket listener;
 
         public AsynchronousSocketListener()
         {
             this.connectionHandle = new ManualResetEvent(false);
             this.clients = new HashSet<Client>();
+            this.blocked = new Dictionary<string, DateTime>();
             this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         }
 
@@ -58,6 +64,7 @@
                 catch (Exception e)
                 {
                     Console.WriteLine(e.ToString());
+                    this.connectionHandle.Set();
                 }
 
                 this.connectionHandle.WaitOne();
@@ -67,6 +74,7 @@
         private void AcceptCallback(IAsyncResult result)
         {
             Socket socket = this.listener.EndAccept(result);
+
             this.connectionHandle.Set();
 
             if (socket == null)
@@ -75,6 +83,14 @@
             }
 
             Client client = new Client(socket);
+
+            IPEndPoint ip = (IPEndPoint)client.Socket.RemoteEndPoint;
+            if (this.blocked.ContainsKey(ip.Address.ToString()))
+            {
+                this.SendBlockedMessage(client, this.blocked[ip.Address.ToString()]);
+                return;
+            }
+
 
             if (this.clients.Count >= MaxNumberOfConcurrentConnections)
             {
@@ -102,29 +118,66 @@
 
                 try
                 {
-                    var disconnectedClients = this.clients.Where(client => !client.IsConnected() || client.Disposed);
+                    var badClients = this.clients.Where(client => !client.IsConnected() || client.Disposed || client.ErrorsAccumulated > 10);
 
-                    foreach (var discClient in disconnectedClients)
+                    foreach (var badClient in badClients)
                     {
-                        AuthenticationServices.TryLogout(discClient);
+                        AuthenticationServices.TryLogout(badClient);
                         try
                         {
-                            if (!discClient.Disposed)
+                            if (badClient.ErrorsAccumulated > 10)
                             {
-                                discClient.Dispose();
+                                this.BlockClient(badClient);
                             }
 
-                            this.clients.Remove(discClient);
+                            badClient.Dispose();
                         }
-                        catch
+                        finally
                         {
-                            this.clients.Remove(discClient);
+                            this.clients.Remove(badClient);
                         }
                     }
                 }
                 catch
                 {
                 }
+            }
+        }
+
+        public void BlockClient(Client client)
+        {
+            try
+            {
+                string ip = ((IPEndPoint)client.Socket.RemoteEndPoint).Address.ToString();
+                if (!this.blocked.ContainsKey(ip))
+                {
+                    this.blocked.Add(ip, DateTime.Now);
+                }
+
+                this.SendBlockedMessage(client, DateTime.Now);
+            }
+            finally
+            {
+                client.Dispose();
+                this.clients.Remove(client);
+            }
+        }
+
+        private void SendBlockedMessage(Client client, DateTime timeOfBlock)
+        {
+            TimeSpan diff = new TimeSpan(DateTime.Now.Ticks - timeOfBlock.Ticks);
+            Message<string> message = 
+                new Message<string>(Service.Info, $"You are blocked. Try again in {diff.Minutes} min : {diff.Seconds} sec");
+
+            Tuple<byte[], int> data = SerManager.SerializeToManagedBufferPrefixed(message);
+            try
+            {
+                client.Socket.Send(data.Item1, 0, data.Item2, SocketFlags.None);
+            }
+            finally
+            {
+                Buffers.Return(data.Item1);
+                client.Dispose();
             }
         }
 
@@ -141,6 +194,7 @@
 
             return IPAddress.Parse("127.0.0.1");
         }
+
 
         public void Dispose()
         {

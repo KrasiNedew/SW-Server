@@ -46,6 +46,7 @@
             }
             catch
             {
+                client.ErrorsAccumulated++;
                 packetAssembler.Dispose();
             }
         }
@@ -86,6 +87,7 @@
             }
             catch (Exception e)
             {
+                client.ErrorsAccumulated++;
                 packetAssembler.Dispose();
                 AuthenticationServices.TryLogout(client);
 
@@ -147,6 +149,7 @@
             }
             catch
             {
+                state.Item1.ErrorsAccumulated++;
                 state.Item2.Dispose();
                 Console.WriteLine("Error while reading length prefix");
             }
@@ -172,6 +175,7 @@
             }
             catch
             {
+                state.Item1.ErrorsAccumulated++;
                 state.Item2.Dispose();
             }
         }

@@ -7,8 +7,6 @@
     using Server.Services;
     using Server.Wrappers;
 
-    using ServerUtils;
-
     public static class Parser
     {
         public static void ParseReceived(Client client, Message message)

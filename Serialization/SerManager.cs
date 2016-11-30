@@ -27,7 +27,7 @@
         }
 
         /// <summary>   
-        /// Serializes any any object that has proto contract
+        /// Serializes any object that has proto contract
         /// to managed buffer from the Buffers static class 
         /// and encodes the length of the buffer in the first 5 bytes. 
         /// If there is no fitting buffer provided from the predefined buffers will throw.

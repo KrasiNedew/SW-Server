@@ -40,6 +40,7 @@
             }
             catch (Exception e)
             {
+                client.ErrorsAccumulated++;
                 Buffers.Return(data?.Item1);
                 Console.WriteLine(e.ToString());
             }
@@ -132,6 +133,7 @@
                                 }
                                 catch (Exception e)
                                 {
+                                    client.ErrorsAccumulated++;
                                     Console.WriteLine(e.ToString());
                                 }
                             }
@@ -164,6 +166,7 @@
             }
             catch (Exception e)
             {
+                state.Item1.ErrorsAccumulated++;
                 Buffers.Return(state.Item2);
                 Console.WriteLine(e.ToString());
             }

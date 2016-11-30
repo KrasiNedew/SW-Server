@@ -18,13 +18,13 @@
 
         private const int NumberOfLargeBuffers = 200;
 
-        private const int TinyBufferSize = 256;
+        public const int TinyBufferSize = 256;
 
-        private const int SmallBufferSize = 1024;
+        public const int SmallBufferSize = 1024;
 
-        private const int MediumBufferSize = 16384;
+        public const int MediumBufferSize = 16384;
 
-        private const int LargeBufferSize = 524288;
+        public const int LargeBufferSize = 524288;
 
         public static Stack<byte[]> PrefixBuffers;
 

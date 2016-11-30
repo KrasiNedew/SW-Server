@@ -18,6 +18,8 @@
 
         public bool Disposed { get; set; }
 
+        public int ErrorsAccumulated { get; set; }
+
         public bool IsConnected()
         {
             try
