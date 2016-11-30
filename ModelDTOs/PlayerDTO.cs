@@ -1,6 +1,5 @@
 ﻿namespace ModelDTOs
 {
-    using System;
     using System.Collections.Generic;
 
     using ModelDTOs.Entities;
@@ -17,13 +16,11 @@
             this.Units = new HashSet<UnitDTO>();
         }
 
-        public PlayerDTO(string username, string passwordHash, int worldSeed, int worldX, int worldY)
+        public PlayerDTO(string username, string passwordHash, int worldSeed)
         {
             this.Username = username;
             this.PasswordHash = passwordHash;
             this.WorldSeed = worldSeed;
-            this.WorldX = worldX;
-            this.WorldY = worldY;
             this.ResourceSet = new ResourceSetDTO(this);
             this.Units = new HashSet<UnitDTO>();
             this.ResourceProviders = new HashSet<ResourceProviderDTO>();
@@ -33,19 +30,12 @@
         public int Id { get; set; }
 
         [ProtoMember(2)]
-        public string Username { get; set; }
+        public string Username { get; private set; }
 
-        [ProtoMember(3)]
         public string PasswordHash { get; set; }
 
         [ProtoMember(4)]
         public int WorldSeed { get; set; }
-
-        [ProtoMember(5)]
-        public float WorldX { get; set; }
-
-        [ProtoMember(6)]
-        public float WorldY { get; set; }
 
         [ProtoMember(7)]
         public bool LoggedIn { get; set; }

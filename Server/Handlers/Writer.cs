@@ -22,7 +22,8 @@
             Tuple<byte[], int> data = null;
             try
             {
-                if (!client.Validated && !(message is Message<string>))
+                if ((client.User == null || !client.User.LoggedIn || client.User.Id == 0) 
+                    && !(message is Message<string>))
                 {
                     throw new InvalidOperationException("Cannot send data to non validated clients");
                 }
@@ -106,7 +107,7 @@
 
             Task.Run(() =>
             {
-                Message<string> senderUsername = new Message<string>(Service.SenderUsername, sender.AuthData.Username);
+                Message<string> senderUsername = new Message<string>(Service.SenderUsername, sender.User.Username);
 
                 try
                 {
@@ -158,7 +159,7 @@
                 }
 
                 int bytesSent = state.Item1.Socket.EndSend(result);
-                Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, state.Item1.AuthData?.Username);
+                Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, state.Item1.User?.Username);
                 Buffers.Return(state.Item2);                
             }
             catch (Exception e)

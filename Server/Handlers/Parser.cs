@@ -20,11 +20,9 @@
                     Writer.SendToThenDropConnection(client, new Message<string>(Service.Login, Messages.InternalErrorDrop));
                     return;
                 case Service.Login:
-                    AuthDataRaw authDataRaw = ((Message<AuthDataRaw>)message).Data;
-                    AuthDataSecure authDataSecure = new AuthDataSecure(authDataRaw.Username, authDataRaw.Password);
-                    authDataRaw.Password = string.Empty;
+                    UserFull loginData = ((Message<UserFull>)message).Data;
 
-                    err = AuthenticationServices.Login(client, authDataSecure);
+                    err = AuthenticationServices.Login(client, loginData);
                     switch (err)
                     {
                         case 0:
@@ -50,7 +48,7 @@
                     switch (err)
                     {
                         case 0:
-                            Writer.SendToThenDropConnection(client,
+                            Writer.SendTo(client,
                                 new Message<string>(Service.Logout, Messages.LogoutSuccess));
                             break;
                         case ErrorCodes.LogoutError:
@@ -67,11 +65,17 @@
                     break;
 
                 case Service.Registration:
-                    AuthDataRaw authDataInsecure = ((Message<AuthDataRaw>)message).Data;
-                    AuthDataSecure authDataReg = new AuthDataSecure(authDataInsecure.Username, authDataInsecure.Password);
-                    authDataInsecure.Password = string.Empty;
+                    UserFull user = ((Message<UserFull>)message).Data;
+                    if (client.User == null || !client.User.LoggedIn || client.User.Id == 0 || string.IsNullOrEmpty(client.User.Username) || string.IsNullOrEmpty(client.User.PasswordHash))
+                    {
+                        client.User = user;
+                        err = AuthenticationServices.Register(client);
+                    }
+                    else
+                    {
+                        err = ErrorCodes.AlreadyLoggedIn;
+                    }
 
-                    err = AuthenticationServices.Register(client, authDataReg);
                     switch (err)
                     {
                         case 0:

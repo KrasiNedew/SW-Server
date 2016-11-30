@@ -4,8 +4,11 @@
     using System.Linq;
 
     using Data;
+    using System.Data.Entity;
+    using System.Threading.Tasks;
 
     using ModelDTOs;
+    using ModelDTOs.Entities;
     using ModelDTOs.Enums;
 
     using Server.Constants;
@@ -16,36 +19,36 @@
 
     public static class AuthenticationServices
     {
-        public static int Login(Client client, AuthDataSecure authData)
-        {
-            if (client.Validated)
-            {
-                return ErrorCodes.AlreadyLoggedIn;
-            }
+        private static readonly UsersManager Users = new UsersManager();
 
- 
+        private static readonly Random Random = new Random();
+
+        public static int Login(Client client, UserFull user)
+        {
+            if (!Users.Exists(user)) return ErrorCodes.InvalidCredentialsError;
+
+            if (Users.IsLoggedIn(user)) return ErrorCodes.AlreadyLoggedIn;
+
+            Users.MarkLogin(user);
+            client.User = Users.GetUser(user);
+
             using (SimpleWarsContext context = new SimpleWarsContext())
             {
+                int id = Users.GetId(client.User);
+
                 PlayerDTO player =
-              context.Players.FirstOrDefault(
-                  p => p.Username == authData.Username && p.PasswordHash == authData.PasswordHash);
+                    context.Players.Include(p => p.ResourceProviders).Include(p => p.Units).Include(p => p.ResourceSet).FirstOrDefault(p => p.Id == id);
 
                 if (player == null)
                 {
-                    return ErrorCodes.InvalidCredentialsError;
-                }
-
-                if (player.LoggedIn)
-                {
-                    return ErrorCodes.AlreadyLoggedIn;
+                    return ErrorCodes.InternalError;
                 }
 
                 player.LoggedIn = true;
                 context.SaveChanges();
-                client.Validated = true;
-                client.AuthData = authData;
+
                 Writer.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
-                Console.WriteLine($"Client {client.AuthData.Username} logged in");
+                Console.WriteLine($"Client {client.User.Username} logged in");
             }
 
             return 0;
@@ -55,19 +58,16 @@
         {
             try
             {
-                if (client?.AuthData == null)
+                if (client.User == null || !Users.IsLoggedIn(client.User) || client.User.Id == 0)
                 {
                     return;
                 }
 
-                AuthDataSecure authData = client.AuthData;
+                Users.MarkLogout(client.User);
 
                 using (SimpleWarsContext context = new SimpleWarsContext())
                 {
-                    var player = context.Players.FirstOrDefault(
-                        p => p.Username == authData.Username && p.PasswordHash == authData.PasswordHash);
-
-                    client.AuthData = null;
+                    var player = context.Players.Find(client.User.Id);
 
                     if (player == null)
                     {
@@ -85,15 +85,16 @@
 
         public static int Logout(Client client)
         {
-            if (!client.Validated)
+            if (client.User == null || !Users.IsLoggedIn(client.User) || client.User.Id == 0)
             {
                 return ErrorCodes.LogoutError;
             }
 
+            Users.MarkLogout(client.User);
+
             using (SimpleWarsContext context = new SimpleWarsContext())
             {
-                var player = context.Players.FirstOrDefault(
-                    p => p.Username == client.AuthData.Username && p.PasswordHash == client.AuthData.PasswordHash);
+                var player = context.Players.Find(client.User.Id);
 
                 if (player == null)
                 {
@@ -102,46 +103,72 @@
 
                 player.LoggedIn = false;
                 context.SaveChanges();
-                client.Validated = false;
-                client.AuthData = null;
             }
 
             return 0;
         }
 
-        public static int Register(Client client, AuthDataSecure authData)
+        public static int Register(Client client)
         {
-            if (client.Validated)
+            if (client.User == null) return -1;
+
+            if (client.User.LoggedIn || Users.IsLoggedIn(client.User))
             {
                 return ErrorCodes.AlreadyLoggedIn;
             }
 
-            if (string.IsNullOrWhiteSpace(authData.Username))
+            client.User.LoggedIn = true;
+
+            if (string.IsNullOrWhiteSpace(client.User.Username))
             {
+                client.User.LoggedIn = false;
                 return ErrorCodes.UsernameEmptyError;
             }
 
-            if (string.IsNullOrWhiteSpace(authData.PasswordHash))
+            if (string.IsNullOrWhiteSpace(client.User.PasswordHash))
             {
+                client.User.LoggedIn = false;
                 return ErrorCodes.PasswordEmptyError;
+            }
+
+            if (Users.Exists(client.User))
+            {
+                client.User.LoggedIn = false;
+                return ErrorCodes.UsernameTakenError;
             }
 
             using (SimpleWarsContext context = new SimpleWarsContext())
             {
-                if (context.Players.Any(p => p.Username == authData.Username))
-                {
-                    return ErrorCodes.UsernameTakenError;
-                }
+                int worldSeed = Random.Next(0, 1000000000);
 
-                PlayerDTO player = new PlayerDTO(authData.Username, authData.PasswordHash, 11293941, 100, 100);
+                PlayerDTO player = new PlayerDTO(client.User.Username, client.User.PasswordHash, worldSeed);
+                player.LoggedIn = true;
                 context.Players.Add(player);
                 context.SaveChanges();
-                client.AuthData = authData;
-                client.Validated = true;
-                Writer.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));   
+                context.Entry(player).Reload();
+                client.User.Id = player.Id;
+                Users.MarkRegister(client.User);
+
+                Writer.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
             }
 
             return 0;
+        }
+
+        public static void LogoutAllUsers()
+        {
+            using (SimpleWarsContext context = new SimpleWarsContext())
+            {
+                lock (Users)
+                {
+                    foreach (var user in Users.GetAll())
+                    {
+                        context.Players.Find(user.Id).LoggedIn = false;
+                    }
+
+                    context.SaveChanges();
+                }
+            }
         }
     }
 }

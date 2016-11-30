@@ -13,6 +13,7 @@
     using Server.Handlers;
     using Server.Services;
     using Server.Wrappers;
+
     public class AsynchronousSocketListener : IDisposable
     {
         private const int ConnectionCheckInterval = 6000;
@@ -36,7 +37,7 @@
         }
 
         public void StartListening(int port)
-        {
+        {    
             IPEndPoint endPoint = new IPEndPoint(GetLocalIPAddress(), port);
             this.listener.Bind(endPoint);
 
@@ -91,8 +92,9 @@
             while (true)
             {
                 Thread.Sleep(ConnectionCheckInterval);
-                int discClients = 0;
+                Console.WriteLine($"Connected clients: {this.clients.Count}");
                 Console.WriteLine($"{Buffers.PrefixBuffers.Count} pb {Buffers.TinyBuffers.Count} tb {Buffers.SmallBuffers.Count} sb {Buffers.MediumBuffers.Count} mb {Buffers.LargeBuffers.Count} lb");
+
                 if (this.clients.Count == 0)
                 {
                     continue;
@@ -113,22 +115,15 @@
                             }
 
                             this.clients.Remove(discClient);
-                            discClients += 1;
                         }
                         catch
                         {
-                            discClients += 1;
                             this.clients.Remove(discClient);
                         }
                     }
                 }
                 catch
                 {
-                }
-
-                if (discClients > 0)
-                {
-                    Console.WriteLine($"{discClients} clients disconnected");
                 }
             }
         }
@@ -149,13 +144,19 @@
 
         public void Dispose()
         {
-            foreach (var client in this.clients)
+            try
             {
-                AuthenticationServices.TryLogout(client);
-                client.Dispose();
-                this.listener.Close();
-                this.listener.Dispose();
+                AuthenticationServices.LogoutAllUsers();
             }
+            finally
+            {
+                foreach (var client in this.clients)
+                {
+                    client.Dispose();
+                    this.listener.Close();
+                    this.listener.Dispose();
+                }
+            }            
         }
     }
 }

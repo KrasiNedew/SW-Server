@@ -57,7 +57,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AuthDataRaw.cs" />
     <Compile Include="Entities\EntityDTO.cs" />
     <Compile Include="Entities\ResourceProviderDTO.cs" />
     <Compile Include="Entities\UnitDTO.cs" />
@@ -68,6 +67,8 @@
     <Compile Include="Resources\ResourceDTO.cs" />
     <Compile Include="Resources\ResourceSetDTO.cs" />
     <Compile Include="Resources\ResourceType.cs" />
+    <Compile Include="UserFull.cs" />
+    <Compile Include="UserLimited.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

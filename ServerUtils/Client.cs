@@ -4,6 +4,8 @@
     using System.Collections.Concurrent;
     using System.Net.Sockets;
 
+    using ModelDTOs;
+
     using ServerUtils;
 
     public class Client : IDisposable
@@ -12,9 +14,7 @@
 
         public Socket Socket { get; }
 
-        public AuthDataSecure AuthData { get; set; }
-
-        public bool Validated { get; set; }
+        public UserFull User { get; set; }
 
         public bool Disposed { get; set; }
 
@@ -36,7 +36,6 @@
         public Client(Socket socket)
         {
             this.Socket = socket;
-            this.Validated = false;
         }
 
         public void Dispose()

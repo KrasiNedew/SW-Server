@@ -11,7 +11,8 @@
     public static class SerManager
     {
         /// <summary>   
-        /// Serializes any object to managed buffer from the Buffers static class. 
+        /// Serializes any object that has proto contract 
+        /// to managed buffer from the Buffers static class. 
         /// If there is no fitting buffer provided from the predefined buffers will throw.
         /// </summary>
         public static Tuple<byte[], int> SerializeToManagedBuffer<T>(T obj)
@@ -26,7 +27,8 @@
         }
 
         /// <summary>   
-        /// Serializes any object to managed buffer from the Buffers static class 
+        /// Serializes any any object that has proto contract
+        /// to managed buffer from the Buffers static class 
         /// and encodes the length of the buffer in the first 5 bytes. 
         /// If there is no fitting buffer provided from the predefined buffers will throw.
         /// </summary>
