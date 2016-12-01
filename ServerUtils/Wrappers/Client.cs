@@ -1,4 +1,4 @@
-﻿namespace ServerUtils
+﻿namespace ServerUtils.Wrappers
 {
     using System;
     using System.Net.Sockets;
@@ -13,7 +13,7 @@
 
         public UserFull User { get; set; }
 
-        public bool Disposed { get; set; }
+        public bool Disposed { get; private set; }
 
         public int ErrorsAccumulated { get; set; }
 

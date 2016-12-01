@@ -33,7 +33,7 @@
         {
             try
             {      
-                server.Dispose();
+                Server.Dispose();
             }
             finally
             {
@@ -48,7 +48,8 @@
         }
         #endregion
 
-        static AsynchronousSocketListener server = new AsynchronousSocketListener();
+        private static readonly AsynchronousSocketListener Server = new AsynchronousSocketListener();
+
         static void Main()
         {
             _handler += Handler;
@@ -57,11 +58,11 @@
             Buffers.Init();
             try
             {
-                server.StartListening(3000);
+                Server.StartListening(3000);
             }
             finally
             {
-                server.Dispose();
+                Server.Dispose();
                 exitSystem.Set();
             }
 

@@ -21,6 +21,7 @@
         FetchOtherPlayers = 16,
         BeginAttack = 17,
         BattleState = 18,
-        BattleEnd = 19
+        BattleEnd = 19,
+        BattleStarted
     }
 }

@@ -3,29 +3,28 @@
     using ModelDTOs;
     using ModelDTOs.Enums;
 
-    using Server.Constants;
     using Server.Services;
 
-    using ServerUtils;
+    using ServerUtils.Wrappers;
 
     public static class Parser
     {
-        public static void ParseReceived(Client client, Message message)
+        public static void ParseReceived(this AsynchronousSocketListener server, Client client, Message message)
         {
             switch (message.Service)
             {
                 case Service.None:
-                    Responses.SomethingWentWrong(client);
+                    server.SomethingWentWrong(client);
                     return;
 
                 case Service.Login:
                     UserFull loginData = ((Message<UserFull>)message).Data;
                     client.User = loginData;
-                    AuthenticationServices.Login(client);
+                    server.Auth.Login(client);
                     break;
 
                 case Service.Logout:
-                    AuthenticationServices.Logout(client);
+                    server.Auth.Logout(client);
                     break;
 
                 case Service.Registration:
@@ -37,17 +36,17 @@
                         || string.IsNullOrEmpty(client.User.PasswordHash))
                     {
                         client.User = user;
-                        AuthenticationServices.Register(client);
+                        server.Auth.Register(client);
                     }
                     else
                     {
-                        Responses.AlreadyLoggedIn(client);
+                        server.AlreadyLoggedIn(client);
                     }
 
                     break;
 
                 default:
-                    Responses.ServiceNotRecognized(client);
+                    server.ServiceNotRecognized(client);
                     break;
             }
         }

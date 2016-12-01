@@ -10,85 +10,88 @@
     using ModelDTOs.Enums;
 
     using Server.CommHandlers;
-
     using ServerUtils;
+    using ServerUtils.Wrappers;
 
-    public static class AuthenticationServices
+    public class AuthenticationServices
     {
-        public static readonly UsersManager Users = new UsersManager();
-
         private static readonly Random Random = new Random();
 
-        public static void Login(Client client)
+        private readonly AsynchronousSocketListener server;
+
+        public AuthenticationServices(AsynchronousSocketListener server)
         {
-            if (client.User == null)
+            this.server = server;
+        }
+
+        public void Login(Client client)
+        {
+            if (client.Disposed) return;
+
+            var users = this.server.Users;
+
+            if (users.IsValidOfflineUser(client.User))
             {
-                Responses.SomethingWentWrong(client);
+                this.server.SomethingWentWrong(client);
                 return;
             }
 
-            // double hash for users that somehow managed to send raw password (which means they are corrupt/modified but whatever)
+            // double hash for Users that somehow managed to send raw password (which means they are corrupt/modified but whatever)
             client.User.PasswordHash = Hash.Generate(client.User.PasswordHash);
-            if (!Users.Exists(client.User))
+            if (!users.Exists(client.User))
             {
-                Responses.InvalidCredentials(client);
+                this.server.InvalidCredentials(client);
                 return;
             }
 
-            if (Users.IsLoggedIn(client.User))
+            if (users.IsLoggedIn(client.User))
             {
-                Responses.AlreadyLoggedIn(client);
+                this.server.AlreadyLoggedIn(client);
                 return;
             }
 
-            Users.MarkLogin(client.User);
-            client.User = Users.GetUser(client.User);
+            users.MarkLogin(client.User);
+            client.User = users.GetUser(client.User);
+            this.server.ClientsByUsername.Add(client.User.Username, client);
 
             using (SimpleWarsContext context = new SimpleWarsContext())
             {
-                int id = Users.GetId(client.User);
+                int id = users.GetId(client.User);
+                context.Database.ExecuteSqlCommand("LoginUser", id);
 
                 PlayerDTO player =
                     context.Players.Include(p => p.ResourceProviders).Include(p => p.Units).Include(p => p.ResourceSet).FirstOrDefault(p => p.Id == id);
 
                 if (player == null)
                 {
-                    Responses.InternalError(client);
+                    this.server.InternalError(client);
                     return;
                 }
 
-                player.LoggedIn = true;
-                context.SaveChanges();
-
-                Writer.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
+                server.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
                 Console.WriteLine($"Client {client.User.Username} logged in");
             }
 
-            Responses.LoginSuccess(client);
+            this.server.LoginSuccess(client);
         }
 
-        public static void TryLogout(Client client)
+        public void TryLogout(Client client)
         {
             try
             {
-                if (client.User == null || !Users.IsLoggedIn(client.User) || client.User.Id == 0)
+                var users = this.server.Users;
+
+                if (users.IsValidOnlineUser(client.User) || client.Disposed)
                 {
                     return;
                 }
 
-                Users.MarkLogout(client.User);
+                users.MarkLogout(client.User);
+                this.server.ClientsByUsername.Remove(client.User.Username);
 
                 using (SimpleWarsContext context = new SimpleWarsContext())
                 {
-                    var player = context.Players.Find(client.User.Id);
-
-                    if (player == null)
-                    {
-                        return;
-                    }
-
-                    player.LoggedIn = false;
-                    context.SaveChanges();
+                    context.Database.ExecuteSqlCommand("LogoutUser", client.User.Id);
                     Console.WriteLine($"Client {client.User.Username} logged out");
                 }
             }
@@ -97,46 +100,46 @@
             }
         }
 
-        public static void Logout(Client client)
+        public void Logout(Client client)
         {
-            if (client.User == null || !Users.IsLoggedIn(client.User) || client.User.Id == 0)
+            if (client.Disposed) return;
+
+            var users = this.server.Users;
+
+            if (users.IsValidOnlineUser(client.User))
             {
-                Responses.MustBeLoggedIn(client);
+                this.server.MustBeLoggedIn(client);
                 return;
             }
 
-            Users.MarkLogout(client.User);
+            users.MarkLogout(client.User);
+            this.server.ClientsByUsername.Remove(client.User.Username);
 
             using (SimpleWarsContext context = new SimpleWarsContext())
             {
-                var player = context.Players.Find(client.User.Id);
-
-                if (player == null)
-                {
-                    Responses.InternalError(client);
-                    return;
-                }
-
-                player.LoggedIn = false;
-                context.SaveChanges();
+                context.Database.ExecuteSqlCommand("LogoutUser", client.User.Id);
                 Console.WriteLine($"Client {client.User.Username} logged out");
             }
 
-            Responses.LogoutSuccess(client);
+            this.server.LogoutSuccess(client);
         }
 
-        public static void Register(Client client)
+        public void Register(Client client)
         {
+            if (client.Disposed) return;
+
             if (client.User == null)
             {
-                Responses.SomethingWentWrong(client);
+                this.server.SomethingWentWrong(client);
                 return;
             }
 
+            var users = this.server.Users;
             client.User.PasswordHash = Hash.Generate(client.User.PasswordHash);
-            if (client.User.LoggedIn || Users.IsLoggedIn(client.User))
+
+            if (client.User.LoggedIn || users.IsLoggedIn(client.User))
             {
-                Responses.AlreadyLoggedIn(client);
+                this.server.AlreadyLoggedIn(client);
                 return;
             }
 
@@ -145,21 +148,21 @@
             if (string.IsNullOrWhiteSpace(client.User.Username))
             {
                 client.User.LoggedIn = false;
-                Responses.UsernameEmpty(client);
+                this.server.UsernameEmpty(client);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(client.User.PasswordHash))
             {
                 client.User.LoggedIn = false;
-                Responses.PasswordEmpty(client);
+                this.server.PasswordEmpty(client);
                 return;
             }
 
-            if (Users.GetAll().Any(u => u.Username == client.User.Username))
+            if (users.GetAll().Any(u => u.Username == client.User.Username))
             {
                 client.User.LoggedIn = false;
-                Responses.UsernameTaken(client);
+                this.server.UsernameTaken(client);
                 return;
             }
 
@@ -171,32 +174,23 @@
                 player.LoggedIn = true;
                 context.Players.Add(player);
                 context.SaveChanges();
-                context.Entry(player).Reload();
                 client.User.Id = player.Id;
-                Users.MarkRegister(client.User);
+                users.MarkRegister(client.User);
+                this.server.ClientsByUsername.Add(client.User.Username, client);
 
-                Writer.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
+                server.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
                 Console.WriteLine($"Client {client.User.Username} registered");
             }
 
-            Responses.RegisterSuccess(client);
+            this.server.RegisterSuccess(client);
         }
 
         public static void LogoutAllUsers()
         {
             using (SimpleWarsContext context = new SimpleWarsContext())
             {
-                lock (Users)
-                {
-                    foreach (var user in Users.GetAll())
-                    {
-                        context.Players.Find(user.Id).LoggedIn = false;
-                    }
-
-                    context.SaveChanges();
-                }
-
-                Console.WriteLine("All users logged out. Server shutting down.");
+                context.Database.ExecuteSqlCommand("LogoutAllUsers");
+                Console.WriteLine("All Users logged out. Server shutting down.");
             }
         }
     }

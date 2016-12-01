@@ -7,22 +7,107 @@
 
     using ModelDTOs;
     using ModelDTOs.Entities;
+    using ModelDTOs.Enums;
     using ModelDTOs.Resources;
 
+    using Server.CommHandlers;
     using ServerUtils;
+    using ServerUtils.Wrappers;
 
     using Z.EntityFramework.Plus;
 
-    public static class GameServices
+    public class GameServices
     {
-        public static void UpdateFull(Client client, PlayerDTO player)
+        private readonly AsynchronousSocketListener server;
+
+        public GameServices(AsynchronousSocketListener server)
+        {
+            this.server = server;
+        }
+
+        public void StartBattle(Client attacker, UserLimited defenderOff)
+        {
+            if (attacker.Disposed 
+                || this.server.Users.IsValidOnlineUser(attacker.User)
+                || defenderOff.Username == null)
+            {
+                this.server.SomethingWentWrong(attacker);
+            }
+
+            Client defender = 
+                this.server
+                .Clients
+                .FirstOrDefault(c => c.User?.Username == defenderOff.Username);
+
+            if (defender == null 
+                || defender.Disposed 
+                || !this.server.Users.IsValidOnlineUser(defender.User))
+            {
+                this.server.SomethingWentWrong(attacker);
+                return;
+            }
+
+            BattleIdentifier identifier = BattleIdentifier.Create(attacker.User.Username, defender.User.Username);
+
+            bool started = this.server.Battles.TryStart(identifier, attacker, defender);
+
+            if (started)
+            {
+                var battle = this.server.Battles.GetByIdentifier(identifier);
+                this.server.SendTo(battle.Attacker, Message.Create(Service.BattleStarted, battle.DefenderDTO));
+                this.server.SendTo(battle.Defender, Message.Create(Service.BattleStarted, battle.AttackerDTO));
+            }
+            else
+            {
+                this.server.SomethingWentWrong(attacker);
+            }
+        }
+
+        public void UpdateBattleState(Client sender, UserLimited other, BattleState senderState)
+        {
+            if (sender.Disposed 
+                || !this.server.Users.IsValidOnlineUser(sender.User)
+                || other.Username == null)
+            {
+                sender.ErrorsAccumulated++;
+                this.server.DataNotSaved(sender);
+                return;
+            }
+            
+            BattleIdentifier identifier = BattleIdentifier.Create(sender.User.Username, other.Username);
+
+            var battle = this.server.Battles.GetByIdentifier(identifier);
+
+            if (battle == null)
+            {
+                this.server.DataNotSaved(sender);
+                return;
+            }
+
+            if (sender.User.Username == battle.AttackerDTO.Username
+                && sender.User.PasswordHash == battle.AttackerDTO.PasswordHash)
+            {    
+                    this.server.SendTo(battle.Defender, 
+                        Message.Create(Service.BattleState, senderState));
+            }
+            else if (sender.User.Username == battle.DefenderDTO.Username
+                     && sender.User.PasswordHash == battle.DefenderDTO.PasswordHash)
+            {
+                this.server.SendTo(battle.Attacker, 
+                    Message.Create(Service.BattleState, senderState));
+            }
+
+
+        }
+
+        public void UpdateFull(Client client, PlayerDTO player)
         {
             if (client.Disposed 
-                || !AuthenticationServices.Users.IsLoggedIn(client.User) 
+                || !server.Users.IsLoggedIn(client.User) 
                 || client.User.Id != player.Id
                 || client.User.Username != player.Username)
             {
-                Responses.DataNotSaved(client);
+                this.server.DataNotSaved(client);
                 return;
             }
 
@@ -39,17 +124,17 @@
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
-                Responses.DataNotSaved(client);
+                this.server.DataNotSaved(client);
             }
         }
 
-        public static void UpdateResources(Client client, ResourceSetDTO resourceSet)
+        public void UpdateResources(Client client, ResourceSetDTO resourceSet)
         {
             if (client.Disposed 
-                || !AuthenticationServices.Users.IsLoggedIn(client.User)
+                || !this.server.Users.IsLoggedIn(client.User)
                 || client.User.Id != resourceSet.Id)
             {
-                Responses.DataNotSaved(client);
+                this.server.DataNotSaved(client);
                 return;
             }
 
@@ -65,29 +150,31 @@
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
-                Responses.DataNotSaved(client);
+                this.server.DataNotSaved(client);
             }
         }
 
-        public static void UpdateEntities(
-            Client client, ICollection<UnitDTO> entities)
+        public void UpdateUnits(
+            Client client, ICollection<UnitDTO> units)
         {
             if (client.Disposed 
-                || !AuthenticationServices.Users.IsLoggedIn(client.User)
-                || entities.Any(e => e.Id != client.User.Id))
+                || !this.server.Users.IsLoggedIn(client.User)
+                || units.Any(e => e.Id != client.User.Id))
             {
-                Responses.DataNotSaved(client);
+                this.server.DataNotSaved(client);
                 return;
             }
 
-            var map = entities.ToDictionary(e => e.Id, e => e);
+            var map = units.ToDictionary(u => u.Id, u => u);
 
             try
             {
                 using (SimpleWarsContext context = new SimpleWarsContext())
                 {
-                    var filtered = context.Units.Where(u => map.ContainsKey(u.Id)).ToDictionary(u => u.Id, u => u);
-
+                    var filtered = context.Units
+                        .Where(u => map.ContainsKey(u.Id))
+                        .ToDictionary(u => u.Id, u => u);
+                       
                     foreach (var id in filtered.Keys)
                     {
                         filtered[id] = map[id];
@@ -99,22 +186,22 @@
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
-                Responses.DataNotSaved(client);
+                this.server.DataNotSaved(client);
             }
         }
 
-        public static void UpdateEntities(
-            Client client, ICollection<ResourceProviderDTO> entities)
+        public void UpdateResourceProviders(
+            Client client, ICollection<ResourceProviderDTO> resourceProviders)
         {
             if (client.Disposed 
-                || !AuthenticationServices.Users.IsLoggedIn(client.User)
-                || entities.Any(e => e.Id != client.User.Id))
+                || !this.server.Users.IsLoggedIn(client.User)
+                || resourceProviders.Any(e => e.Id != client.User.Id))
             {
-                Responses.DataNotSaved(client);
+                this.server.DataNotSaved(client);
                 return;
             }
 
-            var map = entities.ToDictionary(e => e.Id, e => e);
+            var map = resourceProviders.ToDictionary(e => e.Id, e => e);
 
             try
             {
@@ -136,7 +223,7 @@
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
-                Responses.DataNotSaved(client);
+                this.server.DataNotSaved(client);
             }
         }
     }

@@ -61,6 +61,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BattleState.cs" />
     <Compile Include="Entities\EntityDTO.cs" />
     <Compile Include="Entities\ResourceProviderDTO.cs" />
     <Compile Include="Entities\UnitDTO.cs" />

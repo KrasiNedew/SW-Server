@@ -30,6 +30,9 @@
 
         public void MarkRegister(UserFull user)
         {
+            if(!this.IsValidCleanUser(user))
+                throw new ArgumentException("User data is invalid");
+
             this.users.Add(user, user);
         }
 
@@ -59,6 +62,23 @@
             if (!this.Exists(user)) return null;
 
             return this.users[user];
+        }
+
+        public bool IsValidOnlineUser(UserFull user)
+        {
+            return user?.Username != null && user.PasswordHash != null && this.IsLoggedIn(user) && user.Id != 0;
+        }
+
+        public bool IsValidOfflineUser(UserFull user)
+        {
+            return user?.Username != null 
+                && user.PasswordHash != null 
+                && this.Exists(user);
+        }
+
+        public bool IsValidCleanUser(UserFull user)
+        {
+            return user?.Username != null && user.PasswordHash != null;
         }
 
         public IEnumerable<UserFull> GetAll()

@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Net.Sockets;
     using System.Threading.Tasks;
 
@@ -13,10 +14,11 @@
     using Server.Services;
 
     using ServerUtils;
+    using ServerUtils.Wrappers;
 
     public static class Writer
     {
-        public static void SendTo(Client client, Message message)
+        public static void SendTo(this AsynchronousSocketListener server, Client client, Message message)
         {
             if (client.Disposed) return;
 
@@ -47,7 +49,7 @@
             }
         }
 
-        public static void SendToThenDropConnection(Client client, Message message)
+        public static void SendToThenDropConnection(this AsynchronousSocketListener server, Client client, Message message)
         {
             if (client.Disposed) return;
 
@@ -63,31 +65,39 @@
 
                 client.Socket.Send(data.Item1, 0, data.Item2, SocketFlags.None);
 
-                AuthenticationServices.TryLogout(client);
+                server.Auth.TryLogout(client);
                 client.Dispose();
                 Buffers.Return(data.Item1);
             }
             catch (Exception e)
             {
                 Buffers.Return(data?.Item1);
-                AuthenticationServices.TryLogout(client);
+                server.Auth.TryLogout(client);
                 client.Dispose();
                 Console.WriteLine(e.ToString());
             }
         }
 
-        public static void BroadcastToAll(Message message, ISet<Client> clients)
+        // I don't really need broadcasting 
+        // to all clients but its functionality I believe every server should have.
+        public static void BroadcastToAll(this AsynchronousSocketListener server, Message message)
         {
             Task.Run(() =>
-            {
+            {                                    
                 try
                 {
-                    foreach (var client in clients)
+                    // materializing beforehand to ignore 
+                    // other treads manipulating the collection 
+                    //(thats a very bad way of handling concurrency but since I written this method just because a server is supposed to have broadcast  and not actually using it who cares)
+                    var clients = server.Clients.Where(c => !c.Disposed
+                    && c.IsConnected() && c.ErrorsAccumulated <= 10).ToArray();
+
+                        foreach (var client in clients)
                     {
                         try
                         {
                             if(client.Disposed) continue;
-                            SendTo(client, message);
+                            server.SendTo(client, message);
                         }
                         catch (Exception e)
                         {
@@ -103,7 +113,7 @@
             });
         }
 
-        public static void Send(Client sender, Message message, params Client[] receivers)
+        public static void SendFromTo(this AsynchronousSocketListener server, Client sender, Message message, params Client[] receivers)
         {
             if (sender.Disposed) return;
 
@@ -126,8 +136,8 @@
                                 try
                                 {
                                     if(client.Disposed) continue;
-                                    SendTo(client, senderUsername);
-                                    SendTo(client, message);
+                                    server.SendTo(client, senderUsername);
+                                    server.SendTo(client, message);
                                 }
                                 catch (Exception e)
                                 {

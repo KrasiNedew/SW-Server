@@ -42,6 +42,9 @@
         [ProtoMember(7)]
         public bool LoggedIn { get; set; }
 
+        [ProtoMember(8)]
+        public bool UnderAttack { get; set; }
+
         [ProtoMember(14)]
         public virtual ResourceSetDTO ResourceSet { get; private set; }
 
@@ -50,5 +53,10 @@
 
         [ProtoMember(16)]
         public virtual ICollection<UnitDTO> Units { get; private set; }
+
+        public void ChangeAttackState(bool underAttack)
+        {
+            this.UnderAttack = underAttack;
+        }
     }
 }

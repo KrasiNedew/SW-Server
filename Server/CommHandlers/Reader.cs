@@ -4,32 +4,38 @@
     using System.Net.Sockets;
 
     using ModelDTOs;
-    using ModelDTOs.Enums;
-
     using Serialization;
 
-    using Server.Constants;
     using Server.Services;
 
     using ServerUtils;
+    using ServerUtils.Wrappers;
 
-    public static class Reader
+    public class Reader
     {
-        public static void ReadSingleMessage(Client client)
+        private readonly AsynchronousSocketListener server;
+
+        public Reader(AsynchronousSocketListener server)
+        {
+            this.server = server;
+        }
+
+
+        public void ReadSingleMessage(Client client)
         {
             if (client.Disposed) return;
 
-            ReadLengthPrefix(client, false);
+            this.ReadLengthPrefix(client, false);
         }
 
-        public static void ReadMessagesContinously(Client client)
+        public void ReadMessagesContinously(Client client)
         {
             if (client.Disposed) return;
 
-            ReadLengthPrefix(client, true);
+            this.ReadLengthPrefix(client, true);
         }
 
-        private static void ReadMessage(Client client, int messageLength, bool continuous)
+        private void ReadMessage(Client client, int messageLength, bool continuous)
         {
             if (client.Disposed) return;
 
@@ -41,8 +47,7 @@
                     packetAssembler.DataBuffer,
                     0,
                     messageLength,
-                    SocketFlags.None,
-                    MessageReceivedCallback,
+                    SocketFlags.None, this.MessageReceivedCallback,
                     Tuple.Create(client, packetAssembler, continuous));
             }
             catch
@@ -52,7 +57,7 @@
             }
         }
 
-        private static void MessageReceivedCallback(IAsyncResult result)
+        private void MessageReceivedCallback(IAsyncResult result)
         {
             Tuple<Client, MessageReader, bool> state =
                 result.AsyncState as Tuple<Client, MessageReader, bool>;
@@ -78,11 +83,11 @@
                     packetAssembler.Dispose();
 
                     // handle the data
-                    Parser.ParseReceived(client, message);
+                    this.server.ParseReceived(client, message);
 
                     if (state.Item3)
                     {
-                        ReadLengthPrefix(client, listenForNextMessage);
+                        this.ReadLengthPrefix(client, listenForNextMessage);
                     }
                 }
             }
@@ -90,18 +95,13 @@
             {
                 client.ErrorsAccumulated++;
                 packetAssembler.Dispose();
-                AuthenticationServices.TryLogout(client);
-
-                if (client != null)
-                {
-                    Writer.SendToThenDropConnection(client, new Message<string>(Service.None, MessageText.InternalErrorDrop));
-                }
+                this.server.SomethingWentWrong(client);
 
                 Console.WriteLine(e.ToString());
             }
         }
 
-        private static void ReadLengthPrefix(Client client, bool continuous)
+        private void ReadLengthPrefix(Client client, bool continuous)
         {
             if (client.Disposed) return;
 
@@ -113,17 +113,18 @@
                     prefixReader.Buffer,
                     0,
                     PrefixReader.PrefixBytes,
-                    SocketFlags.None,
-                    LengthPrefixReceivedCallback,
+                    SocketFlags.None, this.LengthPrefixReceivedCallback,
                     Tuple.Create(client, prefixReader, continuous));
             }
             catch
             {
+                client.ErrorsAccumulated++;
                 prefixReader.Dispose();
+                this.ReadMessagesContinously(client);
             }
         }
 
-        private static void LengthPrefixReceivedCallback(IAsyncResult result)
+        private void LengthPrefixReceivedCallback(IAsyncResult result)
         {
             Tuple<Client, PrefixReader, bool> state = (Tuple<Client, PrefixReader, bool>)result.AsyncState;
             if (state.Item1.Disposed)
@@ -141,11 +142,11 @@
                 {
                     int messageLength = SerManager.GetLengthPrefix(state.Item2.PrefixData) - PrefixReader.PrefixBytes;
                     state.Item2.Dispose();
-                    ReadMessage(state.Item1, messageLength, state.Item3);
+                    this.ReadMessage(state.Item1, messageLength, state.Item3);
                 }
                 else
                 {
-                    ContinueReadingLengthPrefix(state);
+                    this.ContinueReadingLengthPrefix(state);
                 }
             }
             catch
@@ -153,10 +154,11 @@
                 state.Item1.ErrorsAccumulated++;
                 state.Item2.Dispose();
                 Console.WriteLine("Error while reading length prefix");
+                this.ReadMessagesContinously(state.Item1);
             }
         }
 
-        private static void ContinueReadingLengthPrefix(Tuple<Client, PrefixReader, bool> state)
+        private void ContinueReadingLengthPrefix(Tuple<Client, PrefixReader, bool> state)
         {
             if (state.Item1.Disposed)
             {
@@ -170,14 +172,14 @@
                     state.Item2.Buffer,
                     0,
                     state.Item2.BytesToRead,
-                    SocketFlags.None,
-                    LengthPrefixReceivedCallback,
+                    SocketFlags.None, this.LengthPrefixReceivedCallback,
                     state);
             }
             catch
             {
                 state.Item1.ErrorsAccumulated++;
                 state.Item2.Dispose();
+                this.ReadMessagesContinously(state.Item1);
             }
         }
     }

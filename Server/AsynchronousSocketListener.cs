@@ -7,40 +7,56 @@
     using System.Net.Sockets;
     using System.Threading;
     using System.Threading.Tasks;
-    using ModelDTOs;
-    using ModelDTOs.Enums;
-
-    using Serialization;
 
     using Server.CommHandlers;
-    using Server.Constants;
     using Server.Services;
 
     using ServerUtils;
+    using ServerUtils.Wrappers;
 
     public class AsynchronousSocketListener : IDisposable
     {
         private const int ConnectionCheckInterval = 10000;
 
-        private const int MaxNumberOfConcurrentConnections = 3000;
+        private const int MaxNumberOfConcurrentConnections = 2000;
 
         private const int Backlog = 50;
 
         // Thread signal.
-        private readonly ManualResetEvent connectionHandle;
-
-        private readonly HashSet<Client> clients;
-
-        private readonly Dictionary<string, DateTime> blocked;
+        private readonly ManualResetEvent connectionHandle;    
 
         private readonly Socket listener;
+
+        public readonly UsersManager Users;
+
+        public readonly BattlesManager Battles;
+
+        public readonly HashSet<Client> Clients;
+
+        public readonly Dictionary<string, Client> ClientsByUsername;
+
+        public readonly Dictionary<string, DateTime> BlockedIps;
+
+        public readonly AuthenticationServices Auth;
+
+        public readonly GameServices Game;
+
+        public readonly Reader Reader;
 
         public AsynchronousSocketListener()
         {
             this.connectionHandle = new ManualResetEvent(false);
-            this.clients = new HashSet<Client>();
-            this.blocked = new Dictionary<string, DateTime>();
             this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            this.Users = new UsersManager();
+            this.Battles = new BattlesManager();
+            this.Clients = new HashSet<Client>();
+            this.ClientsByUsername = new Dictionary<string, Client>();
+            this.BlockedIps = new Dictionary<string, DateTime>();
+
+            this.Auth = new AuthenticationServices(this);
+            this.Game = new GameServices(this);
+            this.Reader = new Reader(this);
         }
 
         public void StartListening(int port)
@@ -86,22 +102,22 @@
             Client client = new Client(socket);
 
             IPEndPoint ip = (IPEndPoint)client.Socket.RemoteEndPoint;
-            if (this.blocked.ContainsKey(ip.Address.ToString()))
+            if (this.BlockedIps.ContainsKey(ip.Address.ToString()))
             {
-                Responses.Blocked(client, this.blocked[ip.Address.ToString()]);
+                this.Blocked(client, this.BlockedIps[ip.Address.ToString()]);
                 return;
             }
 
 
-            if (this.clients.Count >= MaxNumberOfConcurrentConnections)
+            if (this.BlockedIps.Count >= MaxNumberOfConcurrentConnections)
             {
-                Writer.SendTo(client, new Message<string>(Service.Info, MessageText.ConnectionLimitReached));
+                this.ServerFull(client);
                 return;
             }
 
-            this.clients.Add(client);
+            this.Clients.Add(client);
 
-            Reader.ReadMessagesContinously(client);
+            this.Reader.ReadMessagesContinously(client);
         }
 
         private void Heartbeat()
@@ -109,10 +125,10 @@
             while (true)
             {
                 Thread.Sleep(ConnectionCheckInterval);
-                Console.WriteLine($"Connected clients: {this.clients.Count}");
+                Console.WriteLine($"Connected clients: {this.Clients.Count}");
                 Console.WriteLine($"{Buffers.PrefixBuffers.Count} pb {Buffers.TinyBuffers.Count} tb {Buffers.SmallBuffers.Count} sb {Buffers.MediumBuffers.Count} mb {Buffers.LargeBuffers.Count} lb");
 
-                if (this.clients.Count == 0)
+                if (this.Clients.Count == 0)
                 {
                     continue;
                 }             
@@ -120,21 +136,21 @@
                 try
                 {
                     ICollection<string> unblocked = 
-                        (from ip in this.blocked.Keys
+                        (from ip in this.BlockedIps.Keys
                         let diff = 
-                        new TimeSpan(DateTime.Now.Ticks - this.blocked[ip].Ticks)
+                        new TimeSpan(DateTime.Now.Ticks - this.BlockedIps[ip].Ticks)
                         where diff.Minutes > 10 select ip).ToList();
 
                     foreach (var ip in unblocked)
                     {
-                        this.blocked.Remove(ip);
+                        this.BlockedIps.Remove(ip);
                     }
 
-                    var badClients = this.clients.Where(client => !client.IsConnected() || client.Disposed || client.ErrorsAccumulated > 10);
+                    var badClients = this.Clients.Where(client => !client.IsConnected() || client.Disposed || client.ErrorsAccumulated > 10);
 
                     foreach (var badClient in badClients)
                     {
-                        AuthenticationServices.TryLogout(badClient);
+                        this.Auth.TryLogout(badClient);
                         try
                         {
                             if (badClient.ErrorsAccumulated > 10)
@@ -146,7 +162,14 @@
                         }
                         finally
                         {
-                            this.clients.Remove(badClient);
+                            this.Clients.Remove(badClient);
+
+                            if (this.Users.IsValidCleanUser(badClient.User)
+                                && this.ClientsByUsername
+                                .ContainsKey(badClient.User.Username))
+                            {
+                                this.ClientsByUsername.Remove(badClient.User.Username);
+                            }
                         }
                     }
                 }
@@ -161,17 +184,22 @@
             try
             {
                 string ip = ((IPEndPoint)client.Socket.RemoteEndPoint).Address.ToString();
-                if (!this.blocked.ContainsKey(ip))
+                if (!this.BlockedIps.ContainsKey(ip))
                 {
-                    this.blocked.Add(ip, DateTime.Now);
+                    this.BlockedIps.Add(ip, DateTime.Now);
                 }
 
-                Responses.Blocked(client, this.blocked[ip]);
+                this.Blocked(client, this.BlockedIps[ip]);
             }
             finally
             {
                 client.Dispose();
-                this.clients.Remove(client);
+                this.Clients.Remove(client);
+
+                if (this.ClientsByUsername.ContainsKey(client.User.Username))
+                {
+                    this.ClientsByUsername.Remove(client.User.Username);
+                }
             }
         }
 
@@ -198,7 +226,7 @@
             }
             finally
             {
-                foreach (var client in this.clients)
+                foreach (var client in this.Clients)
                 {
                     client.Dispose();
                     this.listener.Close();
