@@ -20,6 +20,10 @@
 
         private const int MaxNumberOfConcurrentConnections = 2000;
 
+        private const int BufferPoolSize = 10000;
+
+        private const int MaxBufferSize = 1048576;
+
         private const int Backlog = 50;
 
         // Thread signal.
@@ -43,6 +47,10 @@
 
         public readonly Reader Reader;
 
+        public readonly Writer Writer;
+
+        public readonly Buffers Buffers;
+
         public AsynchronousSocketListener()
         {
             this.connectionHandle = new ManualResetEvent(false);
@@ -57,6 +65,8 @@
             this.Auth = new AuthenticationServices(this);
             this.Game = new GameServices(this);
             this.Reader = new Reader(this);
+            this.Writer = new Writer(this);
+            this.Buffers = new Buffers(BufferPoolSize, MaxBufferSize);
         }
 
         public void StartListening(int port)
@@ -126,7 +136,6 @@
             {
                 Thread.Sleep(ConnectionCheckInterval);
                 Console.WriteLine($"Connected clients: {this.Clients.Count}");
-                Console.WriteLine($"{Buffers.PrefixBuffers.Count} pb {Buffers.TinyBuffers.Count} tb {Buffers.SmallBuffers.Count} sb {Buffers.MediumBuffers.Count} mb {Buffers.LargeBuffers.Count} lb");
 
                 if (this.Clients.Count == 0)
                 {

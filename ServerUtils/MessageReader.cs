@@ -4,25 +4,23 @@
 
     public class MessageReader : IDisposable
     {
-        public MessageReader(int bytesToRead)
+        private readonly Buffers buffers;
+
+        public MessageReader(int bytesToRead, Buffers buffers)
         {
-            this.DataBuffer = Buffers.Take(bytesToRead);
+            this.buffers = buffers;
+            this.DataBuffer = this.buffers.Take(bytesToRead);
         }
 
-        public bool Disposed { get; private set; }
+        private bool Disposed { get; set; }
 
         public byte[] DataBuffer { get; }
-
-        public void CleanDataBuffer()
-        {
-            Buffers.Return(this.DataBuffer);
-        }
 
         public void Dispose()
         {
             if (this.Disposed) return;
 
-            this.CleanDataBuffer();
+            this.buffers.Return(this.DataBuffer);
             this.Disposed = true;
         }
     }

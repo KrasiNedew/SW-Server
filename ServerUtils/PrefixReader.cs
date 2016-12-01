@@ -6,6 +6,15 @@
     {
         public const int PrefixBytes = 5;
 
+        private readonly Buffers buffers;
+
+        public PrefixReader(Buffers buffers)
+        {
+            this.buffers = buffers;
+            this.Buffer = this.buffers.Take(PrefixBytes);
+            this.PrefixData = this.buffers.Take(PrefixBytes);
+        }
+
         public byte[] Buffer { get; private set; }
 
         public byte[] PrefixData { get; private set; }
@@ -14,13 +23,7 @@
 
         public int BytesToRead => PrefixBytes - this.BytesRead;
 
-        public bool Disposed { get; set; }
-
-        public PrefixReader()
-        {
-            this.Buffer = Buffers.Take(PrefixBytes);
-            this.PrefixData = Buffers.Take(PrefixBytes);
-        }
+        private bool Disposed { get; set; }
 
         public void PushReceivedData(int bytesRead)
         {
@@ -44,16 +47,16 @@
         public void CleanBuffer()
         {
             byte[] temp = this.Buffer;
-            this.Buffer = Buffers.Take(this.BytesToRead);
-            Buffers.Return(temp);
+            this.Buffer = this.buffers.Take(this.BytesToRead);
+            this.buffers.Return(temp);
         }
 
         public void Dispose()
         {
             if (this.Disposed) return;
 
-            Buffers.Return(this.Buffer);
-            Buffers.Return(this.PrefixData);
+            this.buffers.Return(this.Buffer);
+            this.buffers.Return(this.PrefixData);
             this.Disposed = true;
         }
     }

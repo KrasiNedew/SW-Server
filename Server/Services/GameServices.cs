@@ -54,8 +54,8 @@
             if (started)
             {
                 var battle = this.server.Battles.GetByIdentifier(identifier);
-                this.server.SendTo(battle.Attacker, Message.Create(Service.BattleStarted, battle.DefenderDTO));
-                this.server.SendTo(battle.Defender, Message.Create(Service.BattleStarted, battle.AttackerDTO));
+                this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleStarted, battle.DefenderDTO));
+                this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleStarted, battle.AttackerDTO));
             }
             else
             {
@@ -87,13 +87,13 @@
             if (sender.User.Username == battle.AttackerDTO.Username
                 && sender.User.PasswordHash == battle.AttackerDTO.PasswordHash)
             {    
-                    this.server.SendTo(battle.Defender, 
+                    this.server.Writer.SendTo(battle.Defender, 
                         Message.Create(Service.BattleState, senderState));
             }
             else if (sender.User.Username == battle.DefenderDTO.Username
                      && sender.User.PasswordHash == battle.DefenderDTO.PasswordHash)
             {
-                this.server.SendTo(battle.Attacker, 
+                this.server.Writer.SendTo(battle.Attacker, 
                     Message.Create(Service.BattleState, senderState));
             }
 

@@ -16,9 +16,16 @@
     using ServerUtils;
     using ServerUtils.Wrappers;
 
-    public static class Writer
+    public class Writer
     {
-        public static void SendTo(this AsynchronousSocketListener server, Client client, Message message)
+        private readonly AsynchronousSocketListener server;
+
+        public Writer(AsynchronousSocketListener server)
+        {
+            this.server = server;
+        }
+
+        public void SendTo(Client client, Message message)
         {
             if (client.Disposed) return;
 
@@ -31,48 +38,49 @@
                     throw new InvalidOperationException("Cannot send data to non validated clients");
                 }
 
-                data = SerManager.SerializeToManagedBufferPrefixed(message);
+                data = SerManager.SerializeToManagedBufferPrefixed(message, this.server.Buffers);
 
                 if (client.Disposed)
                 {
-                    Buffers.Return(data.Item1);
+                    this.server.Buffers.Return(data.Item1);
                     return;
                 }
 
-                client.Socket.BeginSend(data.Item1, 0, data.Item2, SocketFlags.None, SendToCallback, Tuple.Create(client, data.Item1));
+                client.Socket.BeginSend(data.Item1, 0, data.Item2, SocketFlags.None, this.SendToCallback, Tuple.Create(client, data.Item1));
             }
             catch (Exception e)
             {
                 client.ErrorsAccumulated++;
-                Buffers.Return(data?.Item1);
+                server.Buffers.Return(data?.Item1);
                 Console.WriteLine(e.ToString());
             }
         }
 
-        public static void SendToThenDropConnection(this AsynchronousSocketListener server, Client client, Message message)
+        public void SendToThenDropConnection(Client client, Message message)
         {
             if (client.Disposed) return;
 
             Tuple<byte[], int> data = null;
             try
             {
-                data = SerManager.SerializeToManagedBufferPrefixed(message);
+                data = SerManager.SerializeToManagedBufferPrefixed(message, this.server.Buffers);
+
                 if (client.Disposed)
                 {
-                    Buffers.Return(data.Item1);
+                    this.server.Buffers.Return(data.Item1);
                     return;
                 }
 
                 client.Socket.Send(data.Item1, 0, data.Item2, SocketFlags.None);
 
-                server.Auth.TryLogout(client);
+                this.server.Auth.TryLogout(client);
                 client.Dispose();
-                Buffers.Return(data.Item1);
+                this.server.Buffers.Return(data.Item1);
             }
             catch (Exception e)
             {
-                Buffers.Return(data?.Item1);
-                server.Auth.TryLogout(client);
+                this.server.Buffers.Return(data?.Item1);
+                this.server.Auth.TryLogout(client);
                 client.Dispose();
                 Console.WriteLine(e.ToString());
             }
@@ -80,7 +88,7 @@
 
         // I don't really need broadcasting 
         // to all clients but its functionality I believe every server should have.
-        public static void BroadcastToAll(this AsynchronousSocketListener server, Message message)
+        public void BroadcastToAll(Message message)
         {
             Task.Run(() =>
             {                                    
@@ -89,7 +97,7 @@
                     // materializing beforehand to ignore 
                     // other treads manipulating the collection 
                     //(thats a very bad way of handling concurrency but since I written this method just because a server is supposed to have broadcast  and not actually using it who cares)
-                    var clients = server.Clients.Where(c => !c.Disposed
+                    var clients = this.server.Clients.Where(c => !c.Disposed
                     && c.IsConnected() && c.ErrorsAccumulated <= 10).ToArray();
 
                         foreach (var client in clients)
@@ -97,7 +105,7 @@
                         try
                         {
                             if(client.Disposed) continue;
-                            server.SendTo(client, message);
+                            this.server.Writer.SendTo(client, message);
                         }
                         catch (Exception e)
                         {
@@ -113,7 +121,7 @@
             });
         }
 
-        public static void SendFromTo(this AsynchronousSocketListener server, Client sender, Message message, params Client[] receivers)
+        public void SendFromTo(Client sender, Message message, params Client[] receivers)
         {
             if (sender.Disposed) return;
 
@@ -136,8 +144,8 @@
                                 try
                                 {
                                     if(client.Disposed) continue;
-                                    server.SendTo(client, senderUsername);
-                                    server.SendTo(client, message);
+                                    this.server.Writer.SendTo(client, senderUsername);
+                                    this.server.Writer.SendTo(client, message);
                                 }
                                 catch (Exception e)
                                 {
@@ -156,7 +164,7 @@
             });
         }
 
-        private static void SendToCallback(IAsyncResult result)
+        private void SendToCallback(IAsyncResult result)
         {
             Tuple<Client, byte[]> state = (Tuple<Client, byte[]>)result.AsyncState;
             
@@ -164,18 +172,18 @@
             {
                 if (state.Item1.Disposed)
                 {
-                    Buffers.Return(state.Item2);
+                    this.server.Buffers.Return(state.Item2);
                     return;
                 }
 
                 int bytesSent = state.Item1.Socket.EndSend(result);
                 Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, state.Item1.User?.Username);
-                Buffers.Return(state.Item2);                
+                this.server.Buffers.Return(state.Item2);                
             }
             catch (Exception e)
             {
                 state.Item1.ErrorsAccumulated++;
-                Buffers.Return(state.Item2);
+                this.server.Buffers.Return(state.Item2);
                 Console.WriteLine(e.ToString());
             }
         }

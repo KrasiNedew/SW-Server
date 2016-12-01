@@ -68,7 +68,7 @@
                     return;
                 }
 
-                server.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
+                this.server.Writer.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
                 Console.WriteLine($"Client {client.User.Username} logged in");
             }
 
@@ -178,7 +178,7 @@
                 users.MarkRegister(client.User);
                 this.server.ClientsByUsername.Add(client.User.Username, client);
 
-                server.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
+                this.server.Writer.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
                 Console.WriteLine($"Client {client.User.Username} registered");
             }
 

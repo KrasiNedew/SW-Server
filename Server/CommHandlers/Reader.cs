@@ -39,7 +39,7 @@
         {
             if (client.Disposed) return;
 
-            MessageReader packetAssembler = new MessageReader(messageLength);
+            MessageReader packetAssembler = new MessageReader(messageLength, this.server.Buffers);
 
             try
             {
@@ -105,7 +105,7 @@
         {
             if (client.Disposed) return;
 
-            PrefixReader prefixReader = new PrefixReader();
+            PrefixReader prefixReader = new PrefixReader(this.server.Buffers);
 
             try
             {

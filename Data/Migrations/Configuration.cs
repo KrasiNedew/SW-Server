@@ -1,11 +1,8 @@
 namespace Data.Migrations
 {
-    using System;
-    using System.Data.Entity;
     using System.Data.Entity.Migrations;
-    using System.Linq;
 
-    internal sealed class Configuration : DbMigrationsConfiguration<Data.SimpleWarsContext>
+    internal sealed class Configuration : DbMigrationsConfiguration<SimpleWarsContext>
     {
         public Configuration()
         {
@@ -13,7 +10,7 @@ namespace Data.Migrations
             AutomaticMigrationDataLossAllowed = true;
         }
 
-        protected override void Seed(Data.SimpleWarsContext context)
+        protected override void Seed(SimpleWarsContext context)
         {
         }
     }

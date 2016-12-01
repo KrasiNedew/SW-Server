@@ -55,7 +55,6 @@
             _handler += Handler;
             SetConsoleCtrlHandler(_handler, true);
 
-            Buffers.Init();
             try
             {
                 Server.StartListening(3000);
