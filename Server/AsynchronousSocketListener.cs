@@ -8,6 +8,10 @@
     using System.Threading;
     using System.Threading.Tasks;
 
+    using Data;
+
+    using ModelDTOs;
+
     using Server.CommHandlers;
     using Server.CommHandlers.Interfaces;
     using Server.Services;
@@ -17,12 +21,17 @@
 
     public class AsynchronousSocketListener : IDisposable
     {
+        // every 10 sec
         private const int ConnectionCheckInterval = 10000;
+
+        // once a minute
+        private const int DbPersistInterval = 60000;
 
         private const int MaxNumberOfConcurrentConnections = 2000;
 
         private const int BufferPoolSize = 10000;
 
+        // ~1 MB
         private const int MaxBufferSize = 1048576;
 
         private const int Backlog = 50;
@@ -37,6 +46,14 @@
         public readonly BattlesManager Battles;
 
         public readonly HashSet<Client> Clients;
+
+        public readonly HashSet<UserLimited> UsersForShare;
+
+        public readonly SimpleWarsContext Context;
+
+        public readonly Dictionary<UserFull, PlayerDTO> Players;
+
+        public readonly Dictionary<string, PlayerDTO> PlayersByUsername; 
 
         public readonly Dictionary<string, Client> ClientsByUsername;
 
@@ -66,6 +83,10 @@
             this.Clients = new HashSet<Client>();
             this.ClientsByUsername = new Dictionary<string, Client>();
             this.BlockedIps = new Dictionary<string, DateTime>();
+            this.Context = new SimpleWarsContext();
+            this.Players = new Dictionary<UserFull, PlayerDTO>();
+            this.PlayersByUsername = new Dictionary<string, PlayerDTO>();
+            this.UsersForShare = new HashSet<UserLimited>();
 
             this.Auth = new AuthenticationServices(this);
             this.Game = new GameServices(this);
@@ -86,6 +107,7 @@
             Console.WriteLine("Server listening on " + endPoint.Address);
 
             Task.Run(() => { this.Heartbeat(); });
+            Task.Run(() => { this.Persist(); });
 
             while (true)
             {
@@ -107,34 +129,40 @@
 
         private void AcceptCallback(IAsyncResult result)
         {
-            Socket socket = this.listener.EndAccept(result);
-
-            this.connectionHandle.Set();
-
-            if (socket == null)
+            try
             {
-                throw new Exception("Socket was null wtf?");
+                Socket socket = this.listener.EndAccept(result);
+
+                this.connectionHandle.Set();
+
+                if (socket == null)
+                {
+                    throw new Exception("Socket was null wtf?");
+                }
+
+                Client client = new Client(socket);
+
+                IPEndPoint ip = (IPEndPoint)client.Socket.RemoteEndPoint;
+                if (this.BlockedIps.ContainsKey(ip.Address.ToString()))
+                {
+                    this.Responses.Blocked(client, this.BlockedIps[ip.Address.ToString()]);
+                    return;
+                }
+
+
+                if (this.BlockedIps.Count >= MaxNumberOfConcurrentConnections)
+                {
+                    this.Responses.ServerFull(client);
+                    return;
+                }
+
+                this.Clients.Add(client);
+
+                this.Reader.ReadMessagesContinuously(client);
             }
-
-            Client client = new Client(socket);
-
-            IPEndPoint ip = (IPEndPoint)client.Socket.RemoteEndPoint;
-            if (this.BlockedIps.ContainsKey(ip.Address.ToString()))
+            catch
             {
-                this.Responses.Blocked(client, this.BlockedIps[ip.Address.ToString()]);
-                return;
             }
-
-
-            if (this.BlockedIps.Count >= MaxNumberOfConcurrentConnections)
-            {
-                this.Responses.ServerFull(client);
-                return;
-            }
-
-            this.Clients.Add(client);
-
-            this.Reader.ReadMessagesContinuously(client);
         }
 
         private void Heartbeat()
@@ -219,6 +247,22 @@
             }
         }
 
+        private void Persist()
+        {
+            while (true)
+            {
+                Thread.Sleep(DbPersistInterval);
+
+                try
+                {
+                    this.Context.BulkSaveChanges();
+                }
+                catch
+                {
+                }
+            }
+        }
+
         private static IPAddress GetLocalIPAddress()
         {
             var host = Dns.GetHostEntry(Dns.GetHostName());
@@ -238,7 +282,7 @@
         {
             try
             {
-                AuthenticationServices.LogoutAllUsers();
+                this.Auth.LogoutAllUsers();
             }
             finally
             {

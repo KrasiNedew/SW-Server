@@ -63,7 +63,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BattlesManager.cs" />
-    <Compile Include="Hash.cs" />
     <Compile Include="Buffers.cs" />
     <Compile Include="MessageReader.cs" />
     <Compile Include="PrefixReader.cs" />

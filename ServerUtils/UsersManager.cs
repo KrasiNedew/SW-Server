@@ -10,7 +10,7 @@
 
     public class UsersManager
     {
-        private readonly Dictionary<UserFull, UserFull> users; 
+        private readonly Dictionary<UserFull, UserFull> users;
 
         public UsersManager()
         {
@@ -20,7 +20,7 @@
 
         public bool Exists(UserFull user)
         {
-            return this.users.ContainsKey(user);
+            return user != null && this.users.ContainsKey(user);
         }
 
         public bool IsLoggedIn(UserFull user)

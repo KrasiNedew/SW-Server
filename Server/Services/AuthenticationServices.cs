@@ -3,9 +3,6 @@
     using System;
     using System.Linq;
 
-    using Data;
-    using System.Data.Entity;
-
     using ModelDTOs;
     using ModelDTOs.Enums;
 
@@ -43,7 +40,8 @@
                 return;
             }
 
-            if (users.IsLoggedIn(client.User))
+            UserLimited forShare = UserLimited.Create(client.User.Username, true);
+            if (users.IsLoggedIn(client.User) || this.server.Players.ContainsKey(client.User) || this.server.PlayersByUsername.ContainsKey(client.User.Username) || this.server.UsersForShare.Contains(forShare))
             {
                 this.server.Responses.AlreadyLoggedIn(client);
                 return;
@@ -51,27 +49,27 @@
 
             users.MarkLogin(client.User);
             client.User = users.GetUser(client.User);
-            this.server.ClientsByUsername.Add(client.User.Username, client);
+            PlayerDTO player = this.server.Context.Players.Find(users.GetId(client.User));
 
-            using (SimpleWarsContext context = new SimpleWarsContext())
+            if (player == null)
             {
-                int id = users.GetId(client.User);
-                context.Database.ExecuteSqlCommand("LoginUser", id);
-
-                PlayerDTO player =
-                    context.Players.Include(p => p.ResourceProviders).Include(p => p.Units).Include(p => p.ResourceSet).FirstOrDefault(p => p.Id == id);
-
-                if (player == null)
-                {
-                    this.server.Responses.InternalError(client);
-                    return;
-                }
-
-                this.server.Writer.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
-                Console.WriteLine($"Client {client.User.Username} logged in");
+                users.MarkLogout(client.User);
+                client.User = null;
+                this.server.Responses.InternalError(client);
+                return;
             }
 
+            player.LoggedIn = true;
+            this.server.Players.Add(client.User, player);
+            this.server.ClientsByUsername.Add(client.User.Username, client);
+            this.server.PlayersByUsername.Add(client.User.Username, player);
+            this.server.UsersForShare.Add(forShare);
+
+            this.server.Writer.SendTo(client, 
+                Message.Create(Service.PlayerData, player));
             this.server.Responses.LoginSuccess(client);
+
+            Console.WriteLine($"Client {client.User.Username} logged in");
         }
 
         public void TryLogout(Client client)
@@ -87,12 +85,17 @@
 
                 users.MarkLogout(client.User);
                 this.server.ClientsByUsername.Remove(client.User.Username);
-
-                using (SimpleWarsContext context = new SimpleWarsContext())
+                if (this.server.Players.ContainsKey(client.User))
                 {
-                    context.Database.ExecuteSqlCommand("LogoutUser", client.User.Id);
-                    Console.WriteLine($"Client {client.User.Username} logged out");
+                    this.server.Players[client.User].LoggedIn = false;                 
                 }
+
+                this.server.Players.Remove(client.User);
+                this.server.PlayersByUsername.Remove(client.User.Username);
+                this.server.UsersForShare.Remove(UserLimited.Create(client.User.Username, client.User.LoggedIn));
+
+                Console.WriteLine($"Client {client.User.Username} logged out");
+                client.User = null;
             }
             catch
             {
@@ -105,7 +108,7 @@
 
             var users = this.server.Users;
 
-            if (users.IsValidOnlineUser(client.User))
+            if (!users.IsValidOnlineUser(client.User))
             {
                 this.server.Responses.MustBeLoggedIn(client);
                 return;
@@ -114,11 +117,17 @@
             users.MarkLogout(client.User);
             this.server.ClientsByUsername.Remove(client.User.Username);
 
-            using (SimpleWarsContext context = new SimpleWarsContext())
+            if (this.server.Players.ContainsKey(client.User))
             {
-                context.Database.ExecuteSqlCommand("LogoutUser", client.User.Id);
-                Console.WriteLine($"Client {client.User.Username} logged out");
+                this.server.Players[client.User].LoggedIn = false;            
             }
+
+            this.server.Players.Remove(client.User);
+            this.server.PlayersByUsername.Remove(client.User.Username);
+            this.server.UsersForShare.Remove(UserLimited.Create(client.User.Username, client.User.LoggedIn));
+
+            Console.WriteLine($"Client {client.User.Username} logged out");
+            client.User = null;
 
             this.server.Responses.LogoutSuccess(client);
         }
@@ -165,31 +174,42 @@
                 return;
             }
 
-            using (SimpleWarsContext context = new SimpleWarsContext())
-            {
                 int worldSeed = Random.Next(0, 1000000000);
 
                 PlayerDTO player = new PlayerDTO(client.User.Username, client.User.PasswordHash, worldSeed);
                 player.LoggedIn = true;
-                context.Players.Add(player);
-                context.SaveChanges();
+                this.server.Context.Players.Add(player);
+                this.server.Context.SaveChanges();
                 client.User.Id = player.Id;
                 users.MarkRegister(client.User);
                 this.server.ClientsByUsername.Add(client.User.Username, client);
+                this.server.Players.Add(client.User, player);
+                this.server.PlayersByUsername.Add(client.User.Username, player);
+                this.server.UsersForShare.Add(UserLimited.Create(client.User.Username, client.User.LoggedIn));
 
-                this.server.Writer.SendTo(client, new Message<PlayerDTO>(Service.PlayerData, player));
-                Console.WriteLine($"Client {client.User.Username} registered");
-            }
+                this.server.Writer.SendTo(client, 
+                    Message.Create(Service.PlayerData, player));
+                this.server.Responses.RegisterSuccess(client);
 
-            this.server.Responses.RegisterSuccess(client);
+            Console.WriteLine($"Client {client.User.Username} registered");
         }
 
-        public static void LogoutAllUsers()
+        public void LogoutAllUsers()
         {
-            using (SimpleWarsContext context = new SimpleWarsContext())
+            try
             {
-                context.Database.ExecuteSqlCommand("LogoutAllUsers");
+                foreach (var player in this.server.Context.Players)
+                {
+                    player.LoggedIn = false;
+                }
+
+                this.server.Context.BulkSaveChanges();
+
                 Console.WriteLine("All Users logged out. Server shutting down.");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
             }
         }
     }

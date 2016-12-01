@@ -4,6 +4,8 @@
 
     using ProtoBuf;
 
+    using ServerUtils;
+
     [ProtoContract]
     public class UserFull : IEquatable<UserFull>
     {
@@ -39,13 +41,36 @@
         {
             var other = obj as UserFull;
             if (other == null) return false;
-
+            
             return this.Username == other.Username && this.PasswordHash == other.PasswordHash;
         }
 
         public override int GetHashCode()
         {
-            return string.Concat(this.Username, this.PasswordHash).GetHashCode();
+            unchecked
+            {
+                int result = 37; // prime
+
+                result *= 397; // also prime
+                if (this.Username != null)
+                {
+                    result += this.Username.GetHashCode();
+                }
+
+                result *= 397;
+                if (this.PasswordHash != null)
+                {
+                    result += this.PasswordHash.GetHashCode();
+                    result *= 397;
+                    result += this.PasswordHash.GetHashCode();
+                }
+                else
+                {
+                    result *= 397;
+                }
+
+                return result;
+            }
         }
     }
 }

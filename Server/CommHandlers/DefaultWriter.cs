@@ -31,7 +31,7 @@
             try
             {
                 if ((client.User == null || !client.User.LoggedIn || client.User.Id == 0) 
-                    && !(message is Message<string>))
+                    && !(message is Message<string> || message is Message<bool>))
                 {
                     throw new InvalidOperationException("Cannot send data to non validated clients");
                 }
@@ -49,7 +49,7 @@
             catch (Exception e)
             {
                 client.ErrorsAccumulated++;
-                server.Buffers.Return(data?.Item1);
+                this.server.Buffers.Return(data?.Item1);
                 Console.WriteLine(e.ToString());
             }
         }

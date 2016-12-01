@@ -22,6 +22,6 @@
         BeginAttack = 17,
         BattleState = 18,
         BattleEnd = 19,
-        BattleStarted
+        BattleStarted = 20,
     }
 }

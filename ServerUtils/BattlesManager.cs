@@ -2,8 +2,6 @@
 {
     using System.Collections.Generic;
 
-    using ModelDTOs;
-
     using ServerUtils.Wrappers;
 
     public class BattlesManager

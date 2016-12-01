@@ -21,17 +21,25 @@
             switch (message.Service)
             {
                 case Service.None:
-                    server.Responses.SomethingWentWrong(client);
+                    this.server.Responses.SomethingWentWrong(client);
                     return;
 
                 case Service.Login:
-                    UserFull loginData = ((Message<UserFull>)message).Data;
-                    client.User = loginData;
-                    server.Auth.Login(client);
+                    if (!this.server.Users.IsLoggedIn(client.User))
+                    {
+                        UserFull loginData = ((Message<UserFull>)message).Data;
+                        client.User = loginData;
+                        this.server.Auth.Login(client);
+                    }
+                    else
+                    {
+                        this.server.Responses.AlreadyLoggedIn(client);
+                    }
+        
                     break;
 
                 case Service.Logout:
-                    server.Auth.Logout(client);
+                    this.server.Auth.Logout(client);
                     break;
 
                 case Service.Registration:
@@ -43,17 +51,17 @@
                         || string.IsNullOrEmpty(client.User.PasswordHash))
                     {
                         client.User = user;
-                        server.Auth.Register(client);
+                        this.server.Auth.Register(client);
                     }
                     else
                     {
-                        server.Responses.AlreadyLoggedIn(client);
+                        this.server.Responses.AlreadyLoggedIn(client);
                     }
 
                     break;
 
                 default:
-                    server.Responses.ServiceNotRecognized(client);
+                    this.server.Responses.ServiceNotRecognized(client);
                     break;
             }
         }
