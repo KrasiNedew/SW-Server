@@ -31,7 +31,7 @@
                 || this.server.Users.IsValidOnlineUser(attacker.User)
                 || defenderOff.Username == null)
             {
-                this.server.SomethingWentWrong(attacker);
+                this.server.Responses.SomethingWentWrong(attacker);
             }
 
             Client defender = 
@@ -43,7 +43,7 @@
                 || defender.Disposed 
                 || !this.server.Users.IsValidOnlineUser(defender.User))
             {
-                this.server.SomethingWentWrong(attacker);
+                this.server.Responses.SomethingWentWrong(attacker);
                 return;
             }
 
@@ -59,7 +59,7 @@
             }
             else
             {
-                this.server.SomethingWentWrong(attacker);
+                this.server.Responses.SomethingWentWrong(attacker);
             }
         }
 
@@ -70,7 +70,7 @@
                 || other.Username == null)
             {
                 sender.ErrorsAccumulated++;
-                this.server.DataNotSaved(sender);
+                this.server.Responses.DataNotSaved(sender);
                 return;
             }
             
@@ -80,7 +80,7 @@
 
             if (battle == null)
             {
-                this.server.DataNotSaved(sender);
+                this.server.Responses.DataNotSaved(sender);
                 return;
             }
 
@@ -107,7 +107,7 @@
                 || client.User.Id != player.Id
                 || client.User.Username != player.Username)
             {
-                this.server.DataNotSaved(client);
+                this.server.Responses.DataNotSaved(client);
                 return;
             }
 
@@ -124,7 +124,7 @@
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
-                this.server.DataNotSaved(client);
+                this.server.Responses.DataNotSaved(client);
             }
         }
 
@@ -134,7 +134,7 @@
                 || !this.server.Users.IsLoggedIn(client.User)
                 || client.User.Id != resourceSet.Id)
             {
-                this.server.DataNotSaved(client);
+                this.server.Responses.DataNotSaved(client);
                 return;
             }
 
@@ -150,7 +150,7 @@
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
-                this.server.DataNotSaved(client);
+                this.server.Responses.DataNotSaved(client);
             }
         }
 
@@ -161,7 +161,7 @@
                 || !this.server.Users.IsLoggedIn(client.User)
                 || units.Any(e => e.Id != client.User.Id))
             {
-                this.server.DataNotSaved(client);
+                this.server.Responses.DataNotSaved(client);
                 return;
             }
 
@@ -186,7 +186,7 @@
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
-                this.server.DataNotSaved(client);
+                this.server.Responses.DataNotSaved(client);
             }
         }
 
@@ -197,7 +197,7 @@
                 || !this.server.Users.IsLoggedIn(client.User)
                 || resourceProviders.Any(e => e.Id != client.User.Id))
             {
-                this.server.DataNotSaved(client);
+                this.server.Responses.DataNotSaved(client);
                 return;
             }
 
@@ -223,7 +223,7 @@
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
-                this.server.DataNotSaved(client);
+                this.server.Responses.DataNotSaved(client);
             }
         }
     }

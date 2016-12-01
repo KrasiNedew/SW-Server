@@ -3,18 +3,25 @@
     using ModelDTOs;
     using ModelDTOs.Enums;
 
-    using Server.Services;
+    using Server.CommHandlers.Interfaces;
 
     using ServerUtils.Wrappers;
 
-    public static class Parser
+    public class DefaultParser : Parser
     {
-        public static void ParseReceived(this AsynchronousSocketListener server, Client client, Message message)
+        private readonly AsynchronousSocketListener server;
+
+        public DefaultParser(AsynchronousSocketListener server)
+        {
+            this.server = server;
+        }
+
+        public void ParseReceived(Client client, Message message)
         {
             switch (message.Service)
             {
                 case Service.None:
-                    server.SomethingWentWrong(client);
+                    server.Responses.SomethingWentWrong(client);
                     return;
 
                 case Service.Login:
@@ -40,13 +47,13 @@
                     }
                     else
                     {
-                        server.AlreadyLoggedIn(client);
+                        server.Responses.AlreadyLoggedIn(client);
                     }
 
                     break;
 
                 default:
-                    server.ServiceNotRecognized(client);
+                    server.Responses.ServiceNotRecognized(client);
                     break;
             }
         }

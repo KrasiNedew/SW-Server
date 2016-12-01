@@ -12,8 +12,7 @@
     {
         /// <summary>   
         /// Serializes any object that has proto contract 
-        /// to managed buffer from the Buffers static class. 
-        /// If there is no fitting buffer provided from the predefined buffers will throw.
+        /// to managed buffer from the provided buffers. 
         /// </summary>
         public static Tuple<byte[], int> SerializeToManagedBuffer<T>(
             T obj, Buffers buffers)
@@ -29,9 +28,8 @@
 
         /// <summary>   
         /// Serializes any object that has proto contract
-        /// to managed buffer from the Buffers static class 
+        /// to managed buffer from the provided buffers 
         /// and encodes the length of the buffer in the first 5 bytes. 
-        /// If there is no fitting buffer provided from the predefined buffers will throw.
         /// </summary>
         public static Tuple<byte[], int> SerializeToManagedBufferPrefixed<T>(
             T obj, Buffers buffers)

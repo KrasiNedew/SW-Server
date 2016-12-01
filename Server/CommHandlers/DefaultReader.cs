@@ -6,16 +6,16 @@
     using ModelDTOs;
     using Serialization;
 
-    using Server.Services;
+    using Server.CommHandlers.Interfaces;
 
     using ServerUtils;
     using ServerUtils.Wrappers;
 
-    public class Reader
+    public class DefaultReader : Reader
     {
         private readonly AsynchronousSocketListener server;
 
-        public Reader(AsynchronousSocketListener server)
+        public DefaultReader(AsynchronousSocketListener server)
         {
             this.server = server;
         }
@@ -28,7 +28,7 @@
             this.ReadLengthPrefix(client, false);
         }
 
-        public void ReadMessagesContinously(Client client)
+        public void ReadMessagesContinuously(Client client)
         {
             if (client.Disposed) return;
 
@@ -83,7 +83,7 @@
                     packetAssembler.Dispose();
 
                     // handle the data
-                    this.server.ParseReceived(client, message);
+                    this.server.Parser.ParseReceived(client, message);
 
                     if (state.Item3)
                     {
@@ -95,7 +95,7 @@
             {
                 client.ErrorsAccumulated++;
                 packetAssembler.Dispose();
-                this.server.SomethingWentWrong(client);
+                this.server.Responses.SomethingWentWrong(client);
 
                 Console.WriteLine(e.ToString());
             }
@@ -120,7 +120,7 @@
             {
                 client.ErrorsAccumulated++;
                 prefixReader.Dispose();
-                this.ReadMessagesContinously(client);
+                this.ReadMessagesContinuously(client);
             }
         }
 
@@ -154,7 +154,7 @@
                 state.Item1.ErrorsAccumulated++;
                 state.Item2.Dispose();
                 Console.WriteLine("Error while reading length prefix");
-                this.ReadMessagesContinously(state.Item1);
+                this.ReadMessagesContinuously(state.Item1);
             }
         }
 
@@ -179,7 +179,7 @@
             {
                 state.Item1.ErrorsAccumulated++;
                 state.Item2.Dispose();
-                this.ReadMessagesContinously(state.Item1);
+                this.ReadMessagesContinuously(state.Item1);
             }
         }
     }

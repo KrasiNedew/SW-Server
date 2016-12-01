@@ -9,6 +9,7 @@
     using System.Threading.Tasks;
 
     using Server.CommHandlers;
+    using Server.CommHandlers.Interfaces;
     using Server.Services;
 
     using ServerUtils;
@@ -45,9 +46,13 @@
 
         public readonly GameServices Game;
 
+        public readonly PredefinedResponses Responses;
+
         public readonly Reader Reader;
 
         public readonly Writer Writer;
+
+        public readonly Parser Parser;
 
         public readonly Buffers Buffers;
 
@@ -64,8 +69,10 @@
 
             this.Auth = new AuthenticationServices(this);
             this.Game = new GameServices(this);
-            this.Reader = new Reader(this);
-            this.Writer = new Writer(this);
+            this.Reader = new DefaultReader(this);
+            this.Writer = new DefaultWriter(this);
+            this.Responses = new PredefinedResponses(this);
+            this.Parser = new DefaultParser(this);
             this.Buffers = new Buffers(BufferPoolSize, MaxBufferSize);
         }
 
@@ -114,20 +121,20 @@
             IPEndPoint ip = (IPEndPoint)client.Socket.RemoteEndPoint;
             if (this.BlockedIps.ContainsKey(ip.Address.ToString()))
             {
-                this.Blocked(client, this.BlockedIps[ip.Address.ToString()]);
+                this.Responses.Blocked(client, this.BlockedIps[ip.Address.ToString()]);
                 return;
             }
 
 
             if (this.BlockedIps.Count >= MaxNumberOfConcurrentConnections)
             {
-                this.ServerFull(client);
+                this.Responses.ServerFull(client);
                 return;
             }
 
             this.Clients.Add(client);
 
-            this.Reader.ReadMessagesContinously(client);
+            this.Reader.ReadMessagesContinuously(client);
         }
 
         private void Heartbeat()
@@ -198,7 +205,7 @@
                     this.BlockedIps.Add(ip, DateTime.Now);
                 }
 
-                this.Blocked(client, this.BlockedIps[ip]);
+                this.Responses.Blocked(client, this.BlockedIps[ip]);
             }
             finally
             {

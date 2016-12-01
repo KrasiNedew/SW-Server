@@ -1,7 +1,6 @@
 ﻿namespace Server.CommHandlers
 {
     using System;
-    using System.Collections.Generic;
     using System.Linq;
     using System.Net.Sockets;
     using System.Threading.Tasks;
@@ -11,16 +10,15 @@
 
     using Serialization;
 
-    using Server.Services;
+    using Server.CommHandlers.Interfaces;
 
-    using ServerUtils;
     using ServerUtils.Wrappers;
 
-    public class Writer
+    public class DefaultWriter : Writer
     {
         private readonly AsynchronousSocketListener server;
 
-        public Writer(AsynchronousSocketListener server)
+        public DefaultWriter(AsynchronousSocketListener server)
         {
             this.server = server;
         }
@@ -94,13 +92,10 @@
             {                                    
                 try
                 {
-                    // materializing beforehand to ignore 
-                    // other treads manipulating the collection 
-                    //(thats a very bad way of handling concurrency but since I written this method just because a server is supposed to have broadcast  and not actually using it who cares)
                     var clients = this.server.Clients.Where(c => !c.Disposed
                     && c.IsConnected() && c.ErrorsAccumulated <= 10).ToArray();
 
-                        foreach (var client in clients)
+                    foreach (var client in clients)
                     {
                         try
                         {

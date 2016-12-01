@@ -62,15 +62,18 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AsynchronousSocketListener.cs" />
+    <Compile Include="CommHandlers\Interfaces\Parser.cs" />
+    <Compile Include="CommHandlers\Interfaces\Reader.cs" />
+    <Compile Include="CommHandlers\Interfaces\Writer.cs" />
     <Compile Include="Constants\Messages.cs" />
     <Compile Include="Constants\MessageText.cs" />
-    <Compile Include="CommHandlers\Parser.cs" />
-    <Compile Include="CommHandlers\Reader.cs" />
+    <Compile Include="CommHandlers\DefaultParser.cs" />
+    <Compile Include="CommHandlers\DefaultReader.cs" />
     <Compile Include="Services\AuthenticationServices.cs" />
-    <Compile Include="CommHandlers\Writer.cs" />
+    <Compile Include="CommHandlers\DefaultWriter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Services\GameServices.cs" />
-    <Compile Include="Services\Responses.cs" />
+    <Compile Include="Services\PredefinedResponses.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

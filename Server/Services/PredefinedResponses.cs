@@ -5,26 +5,32 @@
     using ModelDTOs;
     using ModelDTOs.Enums;
 
-    using Server.CommHandlers;
     using Server.Constants;
 
     using ServerUtils.Wrappers;
 
-    public static class Responses
+    public class PredefinedResponses
     {
-        public static void InternalError(this AsynchronousSocketListener server, Client client)
+        public readonly AsynchronousSocketListener server;
+
+        public PredefinedResponses(AsynchronousSocketListener server)
+        {
+            this.server = server;
+        }
+
+        public void InternalError(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);
             server.Writer.SendToThenDropConnection(client, Messages.InternalError);
         }
 
-        public static void InvalidCredentials(this AsynchronousSocketListener server, Client client)
+        public void InvalidCredentials(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);
             server.Writer.SendTo(client, Messages.InvalidCredentials);
         }
 
-        public static void Blocked(this AsynchronousSocketListener server, Client client, DateTime timeOfBlock)
+        public void Blocked(Client client, DateTime timeOfBlock)
         {
             server.Writer.SendTo(client, Messages.Error);
             TimeSpan diff = new TimeSpan(DateTime.Now.Ticks - timeOfBlock.Ticks);
@@ -33,85 +39,85 @@
             server.Writer.SendToThenDropConnection(client, message);
         }
 
-        public static void ServerFull(this AsynchronousSocketListener server, Client client)
+        public void ServerFull(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);
             server.Writer.SendToThenDropConnection(client, Messages.ConnectionLimitReached);
         }
 
-        public static void MustBeLoggedIn(this AsynchronousSocketListener server, Client client)
+        public void MustBeLoggedIn(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);
             server.Writer.SendTo(client, Messages.MustLoginFirst);
         }
 
-        public static void AlreadyLoggedIn(this AsynchronousSocketListener server, Client client)
+        public void AlreadyLoggedIn(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);
             server.Writer.SendTo(client, Messages.AlreadyLoggedIn);
         }
 
-        public static void PlayerAlreadyLoggedIn(this AsynchronousSocketListener server, Client client)
+        public void PlayerAlreadyLoggedIn(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);
             server.Writer.SendTo(client, Messages.PlayerAlreadyLoggedIn);
         }
 
-        public static void UsernameEmpty(this AsynchronousSocketListener server, Client client)
+        public void UsernameEmpty(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);
             server.Writer.SendTo(client, Messages.EmptyUsername);
         }
 
-        public static void PasswordEmpty(this AsynchronousSocketListener server, Client client)
+        public void PasswordEmpty(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);
             server.Writer.SendTo(client, Messages.EmptyPassword);
         }
 
-        public static void LoginSuccess(this AsynchronousSocketListener server, Client client)
+        public void LoginSuccess(Client client)
         {
             server.Writer.SendTo(client, Messages.Success);
             server.Writer.SendTo(client, Messages.LoginSuccessful);
         }
 
-        public static void RegisterSuccess(this AsynchronousSocketListener server, Client client)
+        public void RegisterSuccess(Client client)
         {
             server.Writer.SendTo(client, Messages.Success);
             server.Writer.SendTo(client, Messages.RegisterSuccessful);
         }
 
-        public static void LogoutSuccess(this AsynchronousSocketListener server, Client client)
+        public void LogoutSuccess(Client client)
         {
             server.Writer.SendTo(client, Messages.Success);
             server.Writer.SendTo(client, Messages.LogoutSuccess);
         }
 
-        public static void UsernameTaken(this AsynchronousSocketListener server, Client client)
+        public void UsernameTaken(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);
             server.Writer.SendTo(client, Messages.UsernameTaken);
         }
 
-        public static void SomethingWentWrong(this AsynchronousSocketListener server, Client client)
+        public void SomethingWentWrong(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);
             server.Writer.SendTo(client, Messages.SomethingWentWrong);
         }
 
-        public static void ServiceNotRecognized(this AsynchronousSocketListener server, Client client)
+        public void ServiceNotRecognized(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);
             server.Writer.SendToThenDropConnection(client, Messages.ServiceNotRecognized);
         }
 
-        public static void DataNotSaved(this AsynchronousSocketListener server, Client client)
+        public void DataNotSaved(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);
             server.Writer.SendTo(client, Messages.DataNotSaved);
         }
 
-        public static void DataSaved(this AsynchronousSocketListener server, Client client)
+        public void DataSaved(Client client)
         {
             server.Writer.SendTo(client, Messages.Success);
             server.Writer.SendTo(client, Messages.DataSaved);

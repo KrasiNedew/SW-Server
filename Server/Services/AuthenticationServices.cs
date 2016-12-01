@@ -9,7 +9,6 @@
     using ModelDTOs;
     using ModelDTOs.Enums;
 
-    using Server.CommHandlers;
     using ServerUtils;
     using ServerUtils.Wrappers;
 
@@ -32,7 +31,7 @@
 
             if (users.IsValidOfflineUser(client.User))
             {
-                this.server.SomethingWentWrong(client);
+                this.server.Responses.SomethingWentWrong(client);
                 return;
             }
 
@@ -40,13 +39,13 @@
             client.User.PasswordHash = Hash.Generate(client.User.PasswordHash);
             if (!users.Exists(client.User))
             {
-                this.server.InvalidCredentials(client);
+                this.server.Responses.InvalidCredentials(client);
                 return;
             }
 
             if (users.IsLoggedIn(client.User))
             {
-                this.server.AlreadyLoggedIn(client);
+                this.server.Responses.AlreadyLoggedIn(client);
                 return;
             }
 
@@ -64,7 +63,7 @@
 
                 if (player == null)
                 {
-                    this.server.InternalError(client);
+                    this.server.Responses.InternalError(client);
                     return;
                 }
 
@@ -72,7 +71,7 @@
                 Console.WriteLine($"Client {client.User.Username} logged in");
             }
 
-            this.server.LoginSuccess(client);
+            this.server.Responses.LoginSuccess(client);
         }
 
         public void TryLogout(Client client)
@@ -108,7 +107,7 @@
 
             if (users.IsValidOnlineUser(client.User))
             {
-                this.server.MustBeLoggedIn(client);
+                this.server.Responses.MustBeLoggedIn(client);
                 return;
             }
 
@@ -121,7 +120,7 @@
                 Console.WriteLine($"Client {client.User.Username} logged out");
             }
 
-            this.server.LogoutSuccess(client);
+            this.server.Responses.LogoutSuccess(client);
         }
 
         public void Register(Client client)
@@ -130,7 +129,7 @@
 
             if (client.User == null)
             {
-                this.server.SomethingWentWrong(client);
+                this.server.Responses.SomethingWentWrong(client);
                 return;
             }
 
@@ -139,7 +138,7 @@
 
             if (client.User.LoggedIn || users.IsLoggedIn(client.User))
             {
-                this.server.AlreadyLoggedIn(client);
+                this.server.Responses.AlreadyLoggedIn(client);
                 return;
             }
 
@@ -148,21 +147,21 @@
             if (string.IsNullOrWhiteSpace(client.User.Username))
             {
                 client.User.LoggedIn = false;
-                this.server.UsernameEmpty(client);
+                this.server.Responses.UsernameEmpty(client);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(client.User.PasswordHash))
             {
                 client.User.LoggedIn = false;
-                this.server.PasswordEmpty(client);
+                this.server.Responses.PasswordEmpty(client);
                 return;
             }
 
             if (users.GetAll().Any(u => u.Username == client.User.Username))
             {
                 client.User.LoggedIn = false;
-                this.server.UsernameTaken(client);
+                this.server.Responses.UsernameTaken(client);
                 return;
             }
 
@@ -182,7 +181,7 @@
                 Console.WriteLine($"Client {client.User.Username} registered");
             }
 
-            this.server.RegisterSuccess(client);
+            this.server.Responses.RegisterSuccess(client);
         }
 
         public static void LogoutAllUsers()
