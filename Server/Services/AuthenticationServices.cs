@@ -46,10 +46,10 @@
             }
 
             player.LoggedIn = true;
-            this.server.Players.Add(client.User, player);
-            this.server.ClientsByUsername.Add(client.User.Username, client);
-            this.server.PlayersByUsername.Add(client.User.Username, player);
-            this.server.UsersForShare.Add(forShare);
+            this.server.Players.TryAdd(client.User, player);
+            this.server.ClientsByUsername.TryAdd(client.User.Username, client);
+            this.server.PlayersByUsername.TryAdd(client.User.Username, player);
+            this.server.UsersForShare.TryAdd(forShare, forShare);
 
             this.server.Writer.SendTo(client, 
                 Message.Create(Service.PlayerData, player));
@@ -78,10 +78,20 @@
                 this.server.Context.Entry(player).State = EntityState.Detached;;
 
                 users.MarkLogout(client.User);
-                this.server.ClientsByUsername.Remove(client.User.Username);
-                this.server.Players.Remove(client.User);
-                this.server.PlayersByUsername.Remove(client.User.Username);
-                this.server.UsersForShare.Remove(UserLimited.Create(client.User.Username, client.User.LoggedIn));
+                Client removed;
+                PlayerDTO pRemoved;
+                this.server.ClientsByUsername.TryRemove(client.User.Username, out removed);
+                this.server.Players.TryRemove(client.User, out pRemoved);
+                this.server.PlayersByUsername.TryRemove(client.User.Username, out pRemoved);
+
+                UserLimited userRemoved = UserLimited.Create(client.User.Username, client.User.LoggedIn);
+                this.server.UsersForShare.TryRemove(userRemoved, out userRemoved);
+
+                var battle = this.server.Battles.GetByUsername(removed.User.Username);
+                if (battle != null)
+                {
+                    this.server.Game.EndBattle(removed);
+                }
 
                 Console.WriteLine($"Client {client.User.Username} logged out");
                 client.User = null;
@@ -110,10 +120,20 @@
             this.server.Context.Entry(player).State = EntityState.Detached;
 
             users.MarkLogout(client.User);
-            this.server.ClientsByUsername.Remove(client.User.Username);
-            this.server.Players.Remove(client.User);
-            this.server.PlayersByUsername.Remove(client.User.Username);
-            this.server.UsersForShare.Remove(UserLimited.Create(client.User.Username, client.User.LoggedIn));
+            Client removed;
+            PlayerDTO pRemoved;
+            this.server.ClientsByUsername.TryRemove(client.User.Username, out removed);
+            this.server.Players.TryRemove(client.User, out pRemoved);
+            this.server.PlayersByUsername.TryRemove(client.User.Username, out pRemoved);
+
+            UserLimited userRemoved = UserLimited.Create(client.User.Username, client.User.LoggedIn);
+            this.server.UsersForShare.TryRemove(userRemoved, out userRemoved);
+
+            var battle = this.server.Battles.GetByUsername(removed.User.Username);
+            if (battle != null)
+            {
+                this.server.Game.EndBattle(removed);
+            }
 
             Console.WriteLine($"Client {client.User.Username} logged out");
             client.User = null;
@@ -146,10 +166,11 @@
             client.User.Id = player.Id;
             users.MarkRegister(client.User);
 
-            this.server.ClientsByUsername.Add(client.User.Username, client);
-            this.server.Players.Add(client.User, player);
-            this.server.PlayersByUsername.Add(client.User.Username, player);
-            this.server.UsersForShare.Add(UserLimited.Create(client.User.Username, client.User.LoggedIn));
+            this.server.ClientsByUsername.TryAdd(client.User.Username, client);
+            this.server.Players.TryAdd(client.User, player);
+            this.server.PlayersByUsername.TryAdd(client.User.Username, player);
+            UserLimited forShare = UserLimited.Create(client.User.Username, client.User.LoggedIn);
+            this.server.UsersForShare.TryAdd(forShare, forShare);
 
             this.server.Writer.SendTo(client, 
                 Message.Create(Service.PlayerData, player));

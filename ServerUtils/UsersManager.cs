@@ -1,6 +1,7 @@
 ﻿namespace ServerUtils
 {
     using System;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Linq;
 
@@ -10,11 +11,11 @@
 
     public class UsersManager
     {
-        private readonly Dictionary<UserFull, UserFull> users;
+        private readonly ConcurrentDictionary<UserFull, UserFull> users;
 
         public UsersManager()
         {
-            this.users = new Dictionary<UserFull, UserFull>();
+            this.users = new ConcurrentDictionary<UserFull, UserFull>();
             this.LoadUsers();
         }
 
@@ -33,7 +34,7 @@
             if(!this.IsValidCleanUser(user))
                 throw new ArgumentException("User data is invalid");
 
-            this.users.Add(user, user);
+            this.users.TryAdd(user, user);
         }
 
         public void MarkLogout(UserFull user)
@@ -96,7 +97,7 @@
                 {
                     var user = new UserFull(entry.Username, entry.PasswordHash, entry.Id, entry.LoggedIn);
 
-                    this.users.Add(user, user);
+                    this.users.TryAdd(user, user);
                 }
             }
         }

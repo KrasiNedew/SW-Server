@@ -1,5 +1,6 @@
 ﻿namespace Server.Services
 {
+    using System;
     using System.Collections.Generic;
     using System.Data.Entity;
     using System.Linq;
@@ -52,19 +53,60 @@
             var attackerDTO = this.server.Players[attacker.User];
             var defenderDTO = this.server.Players[defender.User];
 
-            BattleInfo battleInfo = BattleInfo.Create(attacker, defender, attackerDTO, defenderDTO);
+            BattleInfo battle = new BattleInfo(attacker, defender, attackerDTO, defenderDTO);
 
-            bool started = this.server.Battles.TryAdd(battleInfo);
+            bool started = this.server.Battles.TryAdd(battle);
 
             if (started)
             {
-                var battle = this.server.Battles.GetByUsername(battleInfo.Attacker.User.Username);
                 this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleStarted, battle.DefenderDTO));
                 this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleStarted, battle.AttackerDTO));
             }
             else
             {
                 this.server.Responses.SomethingWentWrong(attacker);
+            }
+        }
+
+        public void EndBattle(Client client)
+        {
+            var battle = this.server.Battles.GetByUsername(client.User.Username);
+            bool ended = this.server.Battles.TryEnd(battle);
+            if (!ended) return;
+
+            if (client == battle.Attacker)
+            {
+                this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleEnd, "You lost"));
+                this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleEnd, "You won"));
+            }
+            else
+            {
+                this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleEnd, "You won"));
+                this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleEnd, "You lost"));
+            }
+        }
+
+        public void EndBattle(BattleInfo battle)
+        {
+            bool ended = this.server.Battles.TryEnd(battle);
+            if (!ended) return;
+
+            var winner = battle.Score.CalculateWinner(battle.AttackerDTO, battle.DefenderDTO);
+
+            if (winner > 0)
+            {
+                this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleEnd, "You won"));
+                this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleEnd, "You lost"));
+            }
+            else if (winner < 0)
+            {
+                this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleEnd, "You won"));
+                this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleEnd, "You lost"));
+            }
+            else
+            {
+                this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleEnd, "Draw"));
+                this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleEnd, "Draw"));
             }
         }
 
@@ -99,8 +141,7 @@
             this.UpdateResourceSet(client.User, resourceSet);
         }
 
-        public void UpdateUnits(
-            Client client, Message message)
+        public void UpdateUnits(Client client, Message message)
         {
             if (client.Disposed) return;
 
@@ -116,6 +157,7 @@
 
             if (battle != null)
             {
+                battle.LastUpdate = DateTime.Now;
                 this.server.Writer.SendTo(
                     battle.Attacker.User.Username == client.User.Username
                     ? battle.Defender : battle.Attacker,
@@ -125,8 +167,7 @@
             this.UpdateUnits(client.User, units);         
         }
 
-        public void UpdateResourceProviders(
-            Client client, Message message)
+        public void UpdateResourceProviders(Client client, Message message)
         {
             if (client.Disposed) return;
 
@@ -211,13 +252,14 @@
 
             var attached = this.server.Players[user];
 
+            PlayerDTO removed;
             this.server.Context.Entry(attached).State = EntityState.Detached;
-            this.server.Players.Remove(user);
-            this.server.PlayersByUsername.Remove(user.Username);
+            this.server.Players.TryRemove(user, out removed);
+            this.server.PlayersByUsername.TryRemove(user.Username, out removed);
 
             this.server.Context.Players.Attach(detached);
-            this.server.Players.Add(user, detached);
-            this.server.PlayersByUsername.Add(user.Username, detached);
+            this.server.Players.TryAdd(user, detached);
+            this.server.PlayersByUsername.TryAdd(user.Username, detached);
         }
 
         private bool ValidateForUpdate(UserFull user)

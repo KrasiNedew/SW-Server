@@ -1,16 +1,18 @@
 ﻿namespace ServerUtils
 {
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Linq;
 
     using ServerUtils.Wrappers;
 
     public class BattlesManager
     {
-        private readonly Dictionary<string, BattleInfo> battles;
+        private readonly ConcurrentDictionary<string, BattleInfo> battles;
 
         public BattlesManager()
         {
-            this.battles = new Dictionary<string, BattleInfo>();
+            this.battles = new ConcurrentDictionary<string, BattleInfo>();
         }
 
         public bool Exists(BattleInfo battleInfo)
@@ -23,8 +25,8 @@
             if (battleInfo == null
                 || this.Exists(battleInfo)) return false;
 
-            this.battles.Add(battleInfo.Attacker.User.Username, battleInfo);
-            this.battles.Add(battleInfo.Defender.User.Username, battleInfo);
+            this.battles.TryAdd(battleInfo.Attacker.User.Username, battleInfo);
+            this.battles.TryAdd(battleInfo.Defender.User.Username, battleInfo);
             return true;
         }
 
@@ -33,14 +35,32 @@
             if (battleInfo == null 
                 || !this.Exists(battleInfo)) return false;
 
-            this.battles.Remove(battleInfo.Attacker.User.Username);
-            this.battles.Remove(battleInfo.Defender.User.Username);
+            BattleInfo removed;
+            this.battles.TryRemove(battleInfo.Attacker.User.Username, out removed);
+            this.battles.TryRemove(battleInfo.Defender.User.Username, out removed);
             return true;
+        }
+
+        public bool Any()
+        {
+            return this.battles.Any();
+        }
+
+        public IEnumerable<BattleInfo> GetAll()
+        {
+            return this.battles.Values;
         }
 
         public BattleInfo GetByUsername(string username)
         {
-            return !this.battles.ContainsKey(username) ? null : this.battles[username];
+            BattleInfo battle;
+            bool took = this.battles.TryGetValue(username, out battle);
+            if (took)
+            {
+                return battle;
+            }
+
+            return null;
         }
     }
 }

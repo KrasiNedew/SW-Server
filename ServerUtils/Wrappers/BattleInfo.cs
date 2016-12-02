@@ -1,10 +1,8 @@
 ﻿namespace ServerUtils.Wrappers
 {
     using System;
-    using System.Linq;
-    using Data;
-
     using ModelDTOs;
+    using ServerUtils.Helpers;
 
     public class BattleInfo
     {
@@ -14,19 +12,21 @@
             this.Defender = defender;
             this.AttackerDTO = attackerDTO;
             this.DefenderDTO = defenderDTO;
+
+            this.Score = new ScoreCalculator(attackerDTO, defenderDTO);
+            this.LastUpdate = DateTime.Now;
         }
 
         public readonly Client Attacker;
 
         public readonly Client Defender;
 
-        public PlayerDTO AttackerDTO { get; set; }
+        public readonly PlayerDTO AttackerDTO;
 
-        public PlayerDTO DefenderDTO { get; set; }
+        public readonly PlayerDTO DefenderDTO;
 
-        public static BattleInfo Create(Client attacker, Client defender, PlayerDTO attackerDTO, PlayerDTO defenderDTO)
-        {
-            return new BattleInfo(attacker, defender, attackerDTO, defenderDTO);
-        }
+        public readonly ScoreCalculator Score;
+
+        public DateTime LastUpdate { get; set; }
     }
 }

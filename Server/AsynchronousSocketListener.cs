@@ -1,6 +1,7 @@
 ﻿namespace Server
 {
     using System;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Linq;
     using System.Net;
@@ -24,6 +25,10 @@
         // every 10 sec
         private const int ConnectionCheckInterval = 10000;
 
+        private const int BattlesCheckInterval = 5000;
+
+        private const int MaxUpdateInterval = 3000;
+
         // once a minute
         private const int DbPersistInterval = 60000;
 
@@ -45,19 +50,19 @@
 
         public readonly BattlesManager Battles;
 
-        public readonly HashSet<Client> Clients;
+        public readonly ConcurrentDictionary<Client, Client> Clients;
 
-        public readonly HashSet<UserLimited> UsersForShare;
+        public readonly ConcurrentDictionary<UserLimited, UserLimited> UsersForShare;
 
         public readonly SimpleWarsContext Context;
 
-        public readonly Dictionary<UserFull, PlayerDTO> Players;
+        public readonly ConcurrentDictionary<UserFull, PlayerDTO> Players;
 
-        public readonly Dictionary<string, PlayerDTO> PlayersByUsername; 
+        public readonly ConcurrentDictionary<string, PlayerDTO> PlayersByUsername; 
 
-        public readonly Dictionary<string, Client> ClientsByUsername;
+        public readonly ConcurrentDictionary<string, Client> ClientsByUsername;
 
-        public readonly Dictionary<string, DateTime> BlockedIps;
+        public readonly ConcurrentDictionary<string, DateTime> BlockedIps;
 
         public readonly AuthenticationServices Auth;
 
@@ -80,13 +85,13 @@
 
             this.Users = new UsersManager();
             this.Battles = new BattlesManager();
-            this.Clients = new HashSet<Client>();
-            this.ClientsByUsername = new Dictionary<string, Client>();
-            this.BlockedIps = new Dictionary<string, DateTime>();
+            this.Clients = new ConcurrentDictionary<Client, Client>();
+            this.ClientsByUsername = new ConcurrentDictionary<string, Client>();
+            this.BlockedIps = new ConcurrentDictionary<string, DateTime>();
             this.Context = new SimpleWarsContext();
-            this.Players = new Dictionary<UserFull, PlayerDTO>();
-            this.PlayersByUsername = new Dictionary<string, PlayerDTO>();
-            this.UsersForShare = new HashSet<UserLimited>();
+            this.Players = new ConcurrentDictionary<UserFull, PlayerDTO>();
+            this.PlayersByUsername = new ConcurrentDictionary<string, PlayerDTO>();
+            this.UsersForShare = new ConcurrentDictionary<UserLimited, UserLimited>();
 
             this.Auth = new AuthenticationServices(this);
             this.Game = new GameServices(this);
@@ -156,7 +161,7 @@
                     return;
                 }
 
-                this.Clients.Add(client);
+                this.Clients.TryAdd(client, client);
 
                 this.Reader.ReadMessagesContinuously(client);
             }
@@ -185,12 +190,13 @@
                         new TimeSpan(DateTime.Now.Ticks - this.BlockedIps[ip].Ticks)
                         where diff.Minutes > 10 select ip).ToList();
 
+                    DateTime timeRemoved;
                     foreach (var ip in unblocked)
                     {
-                        this.BlockedIps.Remove(ip);
+                        this.BlockedIps.TryRemove(ip, out timeRemoved);
                     }
 
-                    var badClients = this.Clients.Where(client => !client.IsConnected() || client.Disposed || client.ErrorsAccumulated > 10);
+                    var badClients = this.Clients.Keys.Where(client => !client.IsConnected() || client.Disposed || client.ErrorsAccumulated > 10);
 
                     foreach (var badClient in badClients)
                     {
@@ -206,14 +212,44 @@
                         }
                         finally
                         {
-                            this.Clients.Remove(badClient);
+                            Client removed;
+                            this.Clients.TryRemove(badClient, out removed);
 
                             if (this.Users.IsValidCleanUser(badClient.User)
                                 && this.ClientsByUsername
                                 .ContainsKey(badClient.User.Username))
                             {
-                                this.ClientsByUsername.Remove(badClient.User.Username);
+                                this.ClientsByUsername
+                                    .TryRemove(badClient.User.Username, out removed);
                             }
+                        }
+                    }
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        private void CleanBattles()
+        {
+            while (true)
+            {
+                Thread.Sleep(BattlesCheckInterval);
+
+                if (!this.Battles.Any())
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var now = DateTime.Now;
+                    foreach (var battle in this.Battles.GetAll())
+                    {
+                        if (now.Ticks - battle.LastUpdate.Ticks > MaxUpdateInterval)
+                        {
+                            this.Game.EndBattle(battle);
                         }
                     }
                 }
@@ -230,7 +266,7 @@
                 string ip = ((IPEndPoint)client.Socket.RemoteEndPoint).Address.ToString();
                 if (!this.BlockedIps.ContainsKey(ip))
                 {
-                    this.BlockedIps.Add(ip, DateTime.Now);
+                    this.BlockedIps.TryAdd(ip, DateTime.Now);
                 }
 
                 this.Responses.Blocked(client, this.BlockedIps[ip]);
@@ -238,11 +274,12 @@
             finally
             {
                 client.Dispose();
-                this.Clients.Remove(client);
+                Client removed;
+                this.Clients.TryRemove(client, out removed);
 
                 if (this.ClientsByUsername.ContainsKey(client.User.Username))
                 {
-                    this.ClientsByUsername.Remove(client.User.Username);
+                    this.ClientsByUsername.TryRemove(client.User.Username, out removed);
                 }
             }
         }
@@ -286,7 +323,7 @@
             }
             finally
             {
-                foreach (var client in this.Clients)
+                foreach (var client in this.Clients.Keys)
                 {
                     client.Dispose();
                     this.listener.Close();
