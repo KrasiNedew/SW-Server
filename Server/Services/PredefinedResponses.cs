@@ -18,6 +18,16 @@
             this.server = server;
         }
 
+        public void Success(Client client)
+        {
+            this.server.Writer.SendTo(client, Messages.Success);
+        }
+
+        public void Error(Client client)
+        {
+            this.server.Writer.SendTo(client, Messages.Error);
+        }
+
         public void InternalError(Client client)
         {
             server.Writer.SendTo(client, Messages.Error);

@@ -26,7 +26,17 @@
 
         public override int GetHashCode()
         {
-            return this.Identifier.GetHashCode();
+            int res = 37;
+
+            res *= 397;
+            if (this.Identifier != null)
+            {
+                res += this.Identifier.GetHashCode();
+            }
+
+            res *= 397;
+            res *= 397;
+            return res;
         }
 
         public static BattleIdentifier Create(string username1, string username2)

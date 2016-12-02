@@ -6,42 +6,31 @@
 
     using ModelDTOs;
 
-    public class BattleInfo : IDisposable
+    public class BattleInfo
     {
-        public BattleInfo(Client attacker, Client defender)
+        public BattleInfo(Client attacker, Client defender, PlayerDTO attackerDTO, PlayerDTO defenderDTO)
         {
             this.Attacker = attacker;
             this.Defender = defender;
+            this.AttackerDTO = attackerDTO;
+            this.DefenderDTO = defenderDTO;
 
             this.Identifier = new BattleIdentifier(this.Attacker.User.Username, this.Defender.User.Username);
-
-            this.Context = new SimpleWarsContext();
-            this.AttackerDTO = this.Context.Players.Find(this.Attacker.User.Id);
-            this.DefenderDTO = this.Context.Players.Find(this.Defender.User.Id);
         }
 
         public readonly Client Attacker;
 
         public readonly Client Defender;
 
-        public readonly SimpleWarsContext Context;
-
         public readonly BattleIdentifier Identifier;
 
-        public readonly PlayerDTO AttackerDTO;
+        public PlayerDTO AttackerDTO { get; set; }
 
-        public readonly PlayerDTO DefenderDTO;
+        public PlayerDTO DefenderDTO { get; set; }
 
-        public void Dispose()
+        public static BattleInfo Create(Client attacker, Client defender, PlayerDTO attackerDTO, PlayerDTO defenderDTO)
         {
-            try
-            {
-                this.Context.BulkSaveChanges();
-            }
-            finally
-            {
-                this.Context.Dispose();
-            }
+            return new BattleInfo(attacker, defender, attackerDTO, defenderDTO);
         }
     }
 }
