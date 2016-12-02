@@ -25,39 +25,30 @@
                     return;
 
                 case Service.Login:
-                    if (!this.server.Users.IsLoggedIn(client.User))
-                    {
-                        UserFull loginData = ((Message<UserFull>)message).Data;
-                        client.User = loginData;
-                        this.server.Auth.Login(client);
-                    }
-                    else
-                    {
-                        this.server.Responses.AlreadyLoggedIn(client);
-                    }
-        
+                    this.server.Auth.Login(client, message);
                     break;
-
                 case Service.Logout:
                     this.server.Auth.Logout(client);
                     break;
-
                 case Service.Registration:
-                    UserFull user = ((Message<UserFull>)message).Data;
-                    if (client.User == null 
-                        || !client.User.LoggedIn 
-                        || client.User.Id == 0 
-                        || string.IsNullOrEmpty(client.User.Username) 
-                        || string.IsNullOrEmpty(client.User.PasswordHash))
-                    {
-                        client.User = user;
-                        this.server.Auth.Register(client);
-                    }
-                    else
-                    {
-                        this.server.Responses.AlreadyLoggedIn(client);
-                    }
+                    this.server.Auth.Register(client, message);
+                    break;
 
+                case Service.FullUpdate:
+                    this.server.Game.UpdateFull(client, message);
+                    break;
+                case Service.UpdateUnits:
+                    this.server.Game.UpdateUnits(client, message);
+                    break;
+                case Service.UpdateResourceProviders:
+                    this.server.Game.UpdateResourceProviders(client, message);
+                    break;
+                case Service.UpdateResourceSet:
+                    this.server.Game.UpdateResources(client, message);
+                    break;
+
+                case Service.StartBattle:
+                    this.server.Game.StartBattle(client, message);
                     break;
 
                 default:

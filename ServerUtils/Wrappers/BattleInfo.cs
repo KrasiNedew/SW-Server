@@ -14,15 +14,11 @@
             this.Defender = defender;
             this.AttackerDTO = attackerDTO;
             this.DefenderDTO = defenderDTO;
-
-            this.Identifier = new BattleIdentifier(this.Attacker.User.Username, this.Defender.User.Username);
         }
 
         public readonly Client Attacker;
 
         public readonly Client Defender;
-
-        public readonly BattleIdentifier Identifier;
 
         public PlayerDTO AttackerDTO { get; set; }
 

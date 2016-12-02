@@ -1,6 +1,7 @@
 ﻿namespace Server.Services
 {
     using System;
+    using System.Data.Entity;
     using System.Linq;
 
     using ModelDTOs;
@@ -20,36 +21,21 @@
             this.server = server;
         }
 
-        public void Login(Client client)
+        public void Login(Client client, Message message)
         {
             if (client.Disposed) return;
 
+            var loginData = ((Message<UserFull>)message).Data;
             var users = this.server.Users;
 
-            if (users.IsValidOfflineUser(client.User))
-            {
-                this.server.Responses.SomethingWentWrong(client);
-                return;
-            }
+            bool valid = this.ValidateForLogin(client, users, loginData);
 
-            // double hash for Users that somehow managed to send raw password (which means they are corrupt/modified but whatever)
-            client.User.PasswordHash = Hash.Generate(client.User.PasswordHash);
-            if (!users.Exists(client.User))
-            {
-                this.server.Responses.InvalidCredentials(client);
-                return;
-            }
+            if (!valid) return;
 
             UserLimited forShare = UserLimited.Create(client.User.Username, true);
-            if (users.IsLoggedIn(client.User) || this.server.Players.ContainsKey(client.User) || this.server.PlayersByUsername.ContainsKey(client.User.Username) || this.server.UsersForShare.Contains(forShare))
-            {
-                this.server.Responses.AlreadyLoggedIn(client);
-                return;
-            }
 
             users.MarkLogin(client.User);
-            client.User = users.GetUser(client.User);
-            PlayerDTO player = this.server.Context.Players.Find(users.GetId(client.User));
+            PlayerDTO player = this.server.Context.Players.Find(client.User.Id);
 
             if (player == null)
             {
@@ -78,18 +64,21 @@
             {
                 var users = this.server.Users;
 
-                if (users.IsValidOnlineUser(client.User) || client.Disposed)
+                if (client.Disposed 
+                    || users.IsValidOnlineUser(client.User) 
+                    || !this.server.Players.ContainsKey(client.User))
                 {
                     return;
                 }
 
+                
+                var player = this.server.Players[client.User];
+                player.LoggedIn = false;       
+                this.server.Context.BulkSaveChanges();
+                this.server.Context.Entry(player).State = EntityState.Detached;;
+
                 users.MarkLogout(client.User);
                 this.server.ClientsByUsername.Remove(client.User.Username);
-                if (this.server.Players.ContainsKey(client.User))
-                {
-                    this.server.Players[client.User].LoggedIn = false;                 
-                }
-
                 this.server.Players.Remove(client.User);
                 this.server.PlayersByUsername.Remove(client.User.Username);
                 this.server.UsersForShare.Remove(UserLimited.Create(client.User.Username, client.User.LoggedIn));
@@ -108,20 +97,20 @@
 
             var users = this.server.Users;
 
-            if (!users.IsValidOnlineUser(client.User))
+            if (!users.IsValidOnlineUser(client.User) || !this.server.Players.ContainsKey(client.User))
             {
                 this.server.Responses.MustBeLoggedIn(client);
                 return;
             }
 
+
+            var player = this.server.Players[client.User];
+            player.LoggedIn = false;
+            this.server.Context.BulkSaveChanges();
+            this.server.Context.Entry(player).State = EntityState.Detached;
+
             users.MarkLogout(client.User);
             this.server.ClientsByUsername.Remove(client.User.Username);
-
-            if (this.server.Players.ContainsKey(client.User))
-            {
-                this.server.Players[client.User].LoggedIn = false;            
-            }
-
             this.server.Players.Remove(client.User);
             this.server.PlayersByUsername.Remove(client.User.Username);
             this.server.UsersForShare.Remove(UserLimited.Create(client.User.Username, client.User.LoggedIn));
@@ -132,64 +121,39 @@
             this.server.Responses.LogoutSuccess(client);
         }
 
-        public void Register(Client client)
+        public void Register(Client client, Message message)
         {
             if (client.Disposed) return;
 
-            if (client.User == null)
-            {
-                this.server.Responses.SomethingWentWrong(client);
-                return;
-            }
-
+            var regData = ((Message<UserFull>)message).Data;
             var users = this.server.Users;
-            client.User.PasswordHash = Hash.Generate(client.User.PasswordHash);
 
-            if (client.User.LoggedIn || users.IsLoggedIn(client.User))
+            bool valid = this.ValidateForRegister(client, users, regData);
+
+            if (!valid) return;
+
+            int worldSeed = Random.Next(0, 1000000000);
+
+            PlayerDTO player = 
+            new PlayerDTO(client.User.Username, client.User.PasswordHash, worldSeed)
             {
-                this.server.Responses.AlreadyLoggedIn(client);
-                return;
-            }
+                LoggedIn = true
+            };
 
-            client.User.LoggedIn = true;
+            this.server.Context.Players.Add(player);
+            this.server.Context.BulkSaveChanges();
 
-            if (string.IsNullOrWhiteSpace(client.User.Username))
-            {
-                client.User.LoggedIn = false;
-                this.server.Responses.UsernameEmpty(client);
-                return;
-            }
+            client.User.Id = player.Id;
+            users.MarkRegister(client.User);
 
-            if (string.IsNullOrWhiteSpace(client.User.PasswordHash))
-            {
-                client.User.LoggedIn = false;
-                this.server.Responses.PasswordEmpty(client);
-                return;
-            }
+            this.server.ClientsByUsername.Add(client.User.Username, client);
+            this.server.Players.Add(client.User, player);
+            this.server.PlayersByUsername.Add(client.User.Username, player);
+            this.server.UsersForShare.Add(UserLimited.Create(client.User.Username, client.User.LoggedIn));
 
-            if (users.GetAll().Any(u => u.Username == client.User.Username))
-            {
-                client.User.LoggedIn = false;
-                this.server.Responses.UsernameTaken(client);
-                return;
-            }
-
-                int worldSeed = Random.Next(0, 1000000000);
-
-                PlayerDTO player = new PlayerDTO(client.User.Username, client.User.PasswordHash, worldSeed);
-                player.LoggedIn = true;
-                this.server.Context.Players.Add(player);
-                this.server.Context.SaveChanges();
-                client.User.Id = player.Id;
-                users.MarkRegister(client.User);
-                this.server.ClientsByUsername.Add(client.User.Username, client);
-                this.server.Players.Add(client.User, player);
-                this.server.PlayersByUsername.Add(client.User.Username, player);
-                this.server.UsersForShare.Add(UserLimited.Create(client.User.Username, client.User.LoggedIn));
-
-                this.server.Writer.SendTo(client, 
-                    Message.Create(Service.PlayerData, player));
-                this.server.Responses.RegisterSuccess(client);
+            this.server.Writer.SendTo(client, 
+                Message.Create(Service.PlayerData, player));
+            this.server.Responses.RegisterSuccess(client);
 
             Console.WriteLine($"Client {client.User.Username} registered");
         }
@@ -211,6 +175,74 @@
             {
                 Console.WriteLine(e.ToString());
             }
+        }
+
+        private bool ValidateForLogin(Client client, UsersManager users, UserFull loginData)
+        {
+            if (client.User != null) return false;
+
+            loginData.PasswordHash = Hash.Generate(loginData.PasswordHash);
+            var user = users.GetUser(loginData);
+
+            if (!users.Exists(user) || !users.IsValidOfflineUser(user))
+            {
+                this.server.Responses.InvalidCredentials(client);
+                return false;
+            }
+
+            if (users.IsValidOnlineUser(user))
+            {
+                this.server.Responses.AlreadyLoggedIn(client);
+                return false;
+            }
+
+            client.User = user;
+            return true;
+        }
+
+        private bool ValidateForRegister(Client client, UsersManager users, UserFull regData)
+        {
+            if (client.User != null)
+            {
+                this.server.Responses.AlreadyLoggedIn(client);
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(regData.Username))
+            {
+                this.server.Responses.UsernameEmpty(client);
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(regData.PasswordHash))
+            {
+                this.server.Responses.PasswordEmpty(client);
+                return false;
+            }
+
+            if (users.GetAll().Any(u => u.Username == regData.Username))
+            {
+                this.server.Responses.UsernameTaken(client);
+                return false;
+            }
+
+            regData.PasswordHash = Hash.Generate(regData.PasswordHash);
+            var user = users.GetUser(regData);
+
+            if (users.IsValidOnlineUser(user))
+            {
+                this.server.Responses.AlreadyLoggedIn(client);
+                return false;
+            }
+
+            if (user == null)
+            {
+                this.server.Responses.SomethingWentWrong(client);
+                return false;
+            }
+
+            client.User = user;
+            return true;
         }
     }
 }

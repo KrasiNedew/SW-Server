@@ -20,12 +20,18 @@
             this.server = server;
         }
 
-        public void StartBattle(Client attacker, UserLimited defenderOff)
+        public void StartBattle(Client attacker, Message message)
         {
-            if (attacker.Disposed 
-                || !this.server.Users.IsValidOnlineUser(attacker.User)
-                || defenderOff?.Username == null
-                || defenderOff.LoggedIn == false)
+            if (attacker.Disposed ) return;
+            if (!this.server.Users.IsValidOnlineUser(attacker.User))
+            {
+                this.server.Responses.MustBeLoggedIn(attacker);
+                return;
+            }
+
+            var defenderUser = ((Message<UserLimited>)message).Data;
+            if (defenderUser?.Username == null
+                || defenderUser.LoggedIn == false)
             {
                 this.server.Responses.SomethingWentWrong(attacker);
                 return;
@@ -33,7 +39,7 @@
 
             Client defender = 
                 this.server
-                .ClientsByUsername[defenderOff.Username];
+                .ClientsByUsername[defenderUser.Username];
 
             if (defender == null 
                 || defender.Disposed 
@@ -52,7 +58,7 @@
 
             if (started)
             {
-                var battle = this.server.Battles.GetByIdentifier(battleInfo.Identifier);
+                var battle = this.server.Battles.GetByUsername(battleInfo.Attacker.User.Username);
                 this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleStarted, battle.DefenderDTO));
                 this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleStarted, battle.AttackerDTO));
             }
@@ -62,47 +68,14 @@
             }
         }
 
-        public void UpdateBattleState(Client sender, UserLimited other, BattleState senderState)
+        public void UpdateFull(Client client, Message message)
         {
-            if (sender.Disposed 
-                || !this.server.Users.IsValidOnlineUser(sender.User)
-                || other.Username == null)
-            {
-                sender.ErrorsAccumulated++;
-                this.server.Responses.DataNotSaved(sender);
-                return;
-            }
-            
-            BattleIdentifier identifier = BattleIdentifier.Create(sender.User.Username, other.Username);
+            if (client.Disposed) return;
 
-            var battle = this.server.Battles.GetByIdentifier(identifier);
-
-            if (battle == null)
-            {
-                this.server.Responses.DataNotSaved(sender);
-                return;
-            }
-
-            if (sender.User.Username == battle.AttackerDTO.Username
-                && sender.User.PasswordHash == battle.AttackerDTO.PasswordHash)
-            {    
-                    this.server.Writer.SendTo(battle.Defender, 
-                        Message.Create(Service.BattleState, senderState));
-            }
-            else if (sender.User.Username == battle.DefenderDTO.Username
-                     && sender.User.PasswordHash == battle.DefenderDTO.PasswordHash)
-            {
-                this.server.Writer.SendTo(battle.Attacker, 
-                    Message.Create(Service.BattleState, senderState));
-            }
-        }
-
-        public void UpdateFull(Client client, PlayerDTO player)
-        {
-            if (client.Disposed 
-                || !this.server.Users.IsLoggedIn(client.User) 
+            var player = ((Message<PlayerDTO>)message).Data;
+            if (!this.server.Users.IsLoggedIn(client.User) 
                 || client.User.Id != player.Id
-                || client.User.Username != player.Username)
+                || this.server.PlayersByUsername[player.Username].PasswordHash != client.User.PasswordHash)
             {
                 this.server.Responses.DataNotSaved(client);
                 return;
@@ -111,10 +84,12 @@
             this.SwapPlayerData(client.User, player);
         }
 
-        public void UpdateResources(Client client, ResourceSetDTO resourceSet)
+        public void UpdateResources(Client client, Message message)
         {
-            if (client.Disposed 
-                || !this.server.Users.IsLoggedIn(client.User)
+            if (client.Disposed) return;
+
+            var resourceSet = ((Message<ResourceSetDTO>)message).Data;
+            if (!this.server.Users.IsLoggedIn(client.User)
                 || client.User.Id != resourceSet.Id)
             {
                 this.server.Responses.DataNotSaved(client);
@@ -125,24 +100,38 @@
         }
 
         public void UpdateUnits(
-            Client client, ICollection<UnitDTO> units)
+            Client client, Message message)
         {
-            if (client.Disposed 
-                || !this.server.Users.IsLoggedIn(client.User)
+            if (client.Disposed) return;
+
+            var units = ((Message<ICollection<UnitDTO>>)message).Data;
+            if (!this.server.Users.IsLoggedIn(client.User)
                 || units.Any(u => u.OwnerId != client.User.Id))
             {
                 this.server.Responses.DataNotSaved(client);
                 return;
             }
 
-            this.UpdateUnits(client.User, units);
+            var battle = this.server.Battles.GetByUsername(client.User.Username);
+
+            if (battle != null)
+            {
+                this.server.Writer.SendTo(
+                    battle.Attacker.User.Username == client.User.Username
+                    ? battle.Defender : battle.Attacker,
+                    message);
+            }
+
+            this.UpdateUnits(client.User, units);         
         }
 
         public void UpdateResourceProviders(
-            Client client, ICollection<ResourceProviderDTO> resourceProviders)
+            Client client, Message message)
         {
-            if (client.Disposed 
-                || !this.server.Users.IsLoggedIn(client.User)
+            if (client.Disposed) return;
+
+            var resourceProviders = ((Message<ICollection<ResourceProviderDTO>>)message).Data;
+            if (!this.server.Users.IsLoggedIn(client.User)
                 || resourceProviders.Any(e => e.Id != client.User.Id))
             {
                 this.server.Responses.DataNotSaved(client);
