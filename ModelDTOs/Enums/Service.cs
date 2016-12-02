@@ -18,6 +18,7 @@
         FetchOtherPlayers = 16,
         StartBattle = 17,
         BattleEnd = 19,
-        BattleStarted = 20
+        BattleStarted = 20,
+        Ping = 100,
     }
 }

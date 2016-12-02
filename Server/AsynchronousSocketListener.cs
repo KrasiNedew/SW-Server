@@ -13,8 +13,11 @@
 
     using ModelDTOs;
 
+    using Serialization;
+
     using Server.CommHandlers;
     using Server.CommHandlers.Interfaces;
+    using Server.Constants;
     using Server.Services;
 
     using ServerUtils;
@@ -45,6 +48,8 @@
         private readonly ManualResetEvent connectionHandle;    
 
         private readonly Socket listener;
+
+        public readonly byte[] PingByte;
 
         public readonly UsersManager Users;
 
@@ -100,6 +105,7 @@
             this.Responses = new PredefinedResponses(this);
             this.Parser = new DefaultParser(this);
             this.Buffers = new Buffers(BufferPoolSize, MaxBufferSize);
+            this.PingByte = SerManager.SerializeWithLengthPrefix(Messages.Ping);
         }
 
         public void StartListening(int port)
@@ -196,7 +202,7 @@
                         this.BlockedIps.TryRemove(ip, out timeRemoved);
                     }
 
-                    var badClients = this.Clients.Keys.Where(client => !client.IsConnected() || client.Disposed || client.ErrorsAccumulated > 10);
+                    var badClients = this.Clients.Keys.Where(client => !client.IsConnected(this.PingByte) || client.Disposed || client.ErrorsAccumulated > 10);
 
                     foreach (var badClient in badClients)
                     {

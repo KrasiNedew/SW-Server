@@ -1,8 +1,6 @@
 ﻿namespace ModelDTOs
 {
     using System.Collections.Generic;
-    using System.Resources;
-
     using ModelDTOs.Entities;
     using ModelDTOs.Enums;
     using ModelDTOs.Resources;
@@ -10,7 +8,7 @@
     using ProtoBuf;
 
     [ProtoContract]
-    [ProtoInclude(7, typeof(Message<bool>))]
+    [ProtoInclude(7, typeof(Message<byte>))]
     [ProtoInclude(10, typeof(Message<string>))]
     [ProtoInclude(20, typeof(Message<UserFull>))]
     [ProtoInclude(50, typeof(Message<ICollection<UserLimited>>))]

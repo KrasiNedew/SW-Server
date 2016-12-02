@@ -1,6 +1,7 @@
 ﻿namespace Server.Constants
 {
     using ModelDTOs;
+    using ModelDTOs.Enums;
 
     public static class Messages
     {
@@ -51,10 +52,7 @@
 
         public static readonly Message<string> MustLoginFirst = 
             Message.Create(MessageText.MustBeLoggedIn);
-        
-        // 1 bit of data to indicate success or failure of action
-        public static readonly Message<bool> Success = Message.Create(true);
 
-        public static readonly Message<bool> Error = Message.Create(false);
+        public static readonly Message<byte> Ping = Message.Create(Service.Ping, (byte)1);
     }
 }

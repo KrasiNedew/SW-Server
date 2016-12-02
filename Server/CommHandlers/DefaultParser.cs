@@ -50,6 +50,9 @@
                 case Service.StartBattle:
                     this.server.Game.StartBattle(client, message);
                     break;
+                case Service.BattleEnd:
+                    this.server.Game.EndBattle(client);
+                    break;
 
                 default:
                     this.server.Responses.ServiceNotRecognized(client);

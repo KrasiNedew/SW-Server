@@ -7,8 +7,6 @@
 
     public class Client : IDisposable
     {
-        private static readonly byte[] PingByte = new byte[] { 1 };
-
         public Socket Socket { get; }
 
         public UserFull User { get; set; }
@@ -17,13 +15,13 @@
 
         public int ErrorsAccumulated { get; set; }
 
-        public bool IsConnected()
+        public bool IsConnected(byte[] ping)
         {
             try
             {
                 if (this.Disposed) return false;
 
-                int sent = this.Socket.Send(PingByte);
+                int sent = this.Socket.Send(ping);
                 return sent > 0;
             }
             catch

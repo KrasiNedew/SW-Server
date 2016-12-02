@@ -93,7 +93,8 @@
                 try
                 {
                     var clients = this.server.Clients.Keys.Where(c => !c.Disposed
-                    && c.IsConnected() && c.ErrorsAccumulated <= 10).ToArray();
+                    && c.IsConnected(this.server.PingByte) 
+                    && c.ErrorsAccumulated <= 10).ToArray();
 
                     foreach (var client in clients)
                     {
