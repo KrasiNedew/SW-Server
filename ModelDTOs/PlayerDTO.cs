@@ -4,6 +4,7 @@
     using System.Collections.Generic;
     using System.ComponentModel.DataAnnotations;
     using System.ComponentModel.DataAnnotations.Schema;
+    using System.Linq;
 
     using ModelDTOs.Entities;
     using ModelDTOs.Resources;
@@ -50,9 +51,6 @@
         [ProtoMember(7)]
         public bool LoggedIn { get; set; }
 
-        [ProtoMember(8)]
-        public bool UnderAttack { get; set; }
-
         [ProtoMember(14)]
         public virtual ResourceSetDTO ResourceSet { get; private set; }
 
@@ -67,5 +65,11 @@
 
         [NotMapped]
         public Dictionary<Guid, ResourceProviderDTO> ResProvMap { get; private set; }
+
+        public void MapEntites()
+        {
+            this.UnitsMap = this.Units.ToDictionary(u => u.Id, u => u);
+            this.ResProvMap = this.ResourceProviders.ToDictionary(rp => rp.Id, rp => rp);
+        }
     }
 }

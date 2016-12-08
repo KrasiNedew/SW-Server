@@ -41,11 +41,12 @@
                 return;
             }
 
+            player.MapEntites();
             player.LoggedIn = true;
             this.server.Players.TryAdd(client.Id, player);
 
             this.server.Writer.SendTo(client, 
-                Message.Create(Service.PlayerData, player));
+                Message.Create(Service.OwnPlayerData, player));
             this.server.Responses.LoginSuccess(client);
 
             Console.WriteLine($"User {loginData.Username} logged in");
@@ -133,7 +134,7 @@
             this.server.Players.TryAdd(client.Id, player);
 
             this.server.Writer.SendTo(client, 
-                Message.Create(Service.PlayerData, player));
+                Message.Create(Service.OwnPlayerData, player));
             this.server.Responses.RegisterSuccess(client);
 
             Console.WriteLine($"User {regData.Username} registered");

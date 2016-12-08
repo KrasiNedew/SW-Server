@@ -8,12 +8,6 @@
     {
         void SendTo(Client client, Message message);
 
-        void SendFromTo(Client sender, Message message, params Client[] receivers);
-
         void SendToThenDropConnection(Client client, Message message);
-
-        void BroadcastToAll(Message message);
-
-
     }
 }

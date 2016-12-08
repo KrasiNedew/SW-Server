@@ -69,10 +69,6 @@
         [ProtoMember(10)]
         public Guid OwnerId { get; private set; }
 
-        [ProtoMember(77)]
-        [NotMapped]
-        public bool Modified { get; set; }
-
         public virtual PlayerDTO Owner { get; private set; }
     }
 }
