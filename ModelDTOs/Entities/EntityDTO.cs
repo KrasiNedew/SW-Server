@@ -1,7 +1,8 @@
 ﻿namespace ModelDTOs.Entities
 {
     using System;
-    using System.Runtime.Serialization;
+    using System.ComponentModel.DataAnnotations;
+    using System.ComponentModel.DataAnnotations.Schema;
 
     using ProtoBuf;
 
@@ -23,9 +24,9 @@
             float rotZ,
             float scale,
             float weight,
-            string type,
             PlayerDTO owner)
         {
+            this.Id = Guid.NewGuid();
             this.PosX = posX;
             this.PosY = posY;
             this.PosZ = posZ;
@@ -34,12 +35,12 @@
             this.RotZ = rotZ;
             this.Scale = scale;
             this.Weight = weight;
-            this.Type = type;
             this.Owner = owner;
         }
 
         [ProtoMember(1)]
-        public int Id { get; set; }
+        [Key, DatabaseGenerated(DatabaseGeneratedOption.None)]
+        public Guid Id { get; private set; }
 
         [ProtoMember(2)]
         public float PosX { get; set; }
@@ -65,10 +66,12 @@
         [ProtoMember(9)]
         public float Weight { get; set; }
 
-        public string Type { get; set; }
-
         [ProtoMember(10)]
-        public int OwnerId { get; private set; }
+        public Guid OwnerId { get; private set; }
+
+        [ProtoMember(77)]
+        [NotMapped]
+        public bool Modified { get; set; }
 
         public virtual PlayerDTO Owner { get; private set; }
     }

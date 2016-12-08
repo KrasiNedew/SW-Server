@@ -21,46 +21,77 @@
             this.server = server;
         }
 
+        public void SendOtherPlayers(Client client)
+        {
+            if(client.Disposed) return;
+            if (!this.server.Players.ContainsKey(client.Id))
+            {
+                this.server.Responses.MustBeLoggedIn(client);
+                return;
+            }
+
+            Message<string[]> message = Message.Create(
+                Service.OtherPlayers,
+                this.server.Players.Values.Select(p => p.Username).ToArray());
+
+            this.server.Writer.SendTo(client, message);
+        }
+
         public void StartBattle(Client attacker, Message message)
         {
             if (attacker.Disposed ) return;
-            if (!this.server.Users.IsValidOnlineUser(attacker.User))
+            if (!this.server.Players.ContainsKey(attacker.Id))
             {
                 this.server.Responses.MustBeLoggedIn(attacker);
                 return;
             }
 
-            var defenderUser = ((Message<UserLimited>)message).Data;
-            if (defenderUser?.Username == null
-                || defenderUser.LoggedIn == false)
+            if (attacker.BattleId != Guid.Empty)
             {
                 this.server.Responses.SomethingWentWrong(attacker);
                 return;
             }
 
-            Client defender = 
-                this.server
-                .ClientsByUsername[defenderUser.Username];
-
-            if (defender == null 
-                || defender.Disposed 
-                || !this.server.Users.IsValidOnlineUser(defender.User))
+            var defenderUsername = ((Message<string>)message).Data;
+            if (defenderUsername == null)
             {
                 this.server.Responses.SomethingWentWrong(attacker);
                 return;
             }
 
-            var attackerDTO = this.server.Players[attacker.User];
-            var defenderDTO = this.server.Players[defender.User];
+            Guid id;
+            try
+            {
+                id = this.server.Players
+                    .FirstOrDefault(e => e.Value.Username == defenderUsername).Key;
+            }
+            catch
+            {
+                this.server.Responses.SomethingWentWrong(attacker);
+                return;
+            }
 
-            BattleInfo battle = new BattleInfo(attacker, defender, attackerDTO, defenderDTO);
+            Client defender;
+            bool gotIt = this.server.Clients.TryGetValue(id, out defender);
 
-            bool started = this.server.Battles.TryAdd(battle);
+            if (!gotIt 
+                || defender.Disposed
+                || defender.BattleId != Guid.Empty)
+            {
+                this.server.Responses.SomethingWentWrong(attacker);
+                return;
+            }
+
+            BattleInfo battle = new BattleInfo(attacker, defender);
+
+            bool started = this.server.Battles.TryAdd(battle.Id, battle);
 
             if (started)
             {
-                this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleStarted, battle.DefenderDTO));
-                this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleStarted, battle.AttackerDTO));
+                attacker.BattleId = battle.Id;
+                defender.BattleId = battle.Id;
+                this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleStarted, this.server.Players[battle.Defender.Id]));
+                this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleStarted, this.server.Players[battle.Attacker.Id]));
             }
             else
             {
@@ -70,9 +101,10 @@
 
         public void EndBattle(Client client)
         {
-            var battle = this.server.Battles.GetByUsername(client.User.Username);
-            bool ended = this.server.Battles.TryEnd(battle);
-            if (!ended) return;
+            BattleInfo battle;
+            bool removed = this.server.Battles.TryRemove(client.BattleId, out battle);
+
+            if (!removed) return;
 
             if (client == battle.Attacker)
             {
@@ -84,112 +116,95 @@
                 this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleEnd, "You won"));
                 this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleEnd, "You lost"));
             }
+
+            battle.Attacker.BattleId = Guid.Empty;
+            battle.Defender.BattleId = Guid.Empty;
         }
 
         public void EndBattle(BattleInfo battle)
         {
-            bool ended = this.server.Battles.TryEnd(battle);
+            bool ended = this.server.Battles.TryRemove(battle.Id, out battle);
             if (!ended) return;
 
-            var winner = battle.Score.CalculateWinner(battle.AttackerDTO, battle.DefenderDTO);
-
-            if (winner > 0)
-            {
-                this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleEnd, "You won"));
-                this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleEnd, "You lost"));
-            }
-            else if (winner < 0)
-            {
-                this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleEnd, "You won"));
-                this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleEnd, "You lost"));
-            }
-            else
-            {
-                this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleEnd, "Draw"));
-                this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleEnd, "Draw"));
-            }
-        }
-
-        public void UpdateFull(Client client, Message message)
-        {
-            if (client.Disposed) return;
-
-            var player = ((Message<PlayerDTO>)message).Data;
-            if (!this.server.Users.IsLoggedIn(client.User) 
-                || client.User.Id != player.Id
-                || this.server.PlayersByUsername[player.Username].PasswordHash != client.User.PasswordHash)
-            {
-                this.server.Responses.DataNotSaved(client);
-                return;
-            }
-
-            this.SwapPlayerData(client.User, player);
+            this.server.Writer.SendTo(battle.Attacker, Message.Create(Service.BattleEnd, "Battle terminated"));
+            this.server.Writer.SendTo(battle.Defender, Message.Create(Service.BattleEnd, "Battle terminated"));
+            battle.Attacker.BattleId = Guid.Empty;
+            battle.Defender.BattleId = Guid.Empty;
         }
 
         public void UpdateResources(Client client, Message message)
         {
             if (client.Disposed) return;
 
-            var resourceSet = ((Message<ResourceSetDTO>)message).Data;
-            if (!this.server.Users.IsLoggedIn(client.User)
-                || client.User.Id != resourceSet.Id)
+            if (!this.server.Players.ContainsKey(client.Id))
             {
-                this.server.Responses.DataNotSaved(client);
+                this.server.Responses.MustBeLoggedIn(client);
                 return;
             }
 
-            this.UpdateResourceSet(client.User, resourceSet);
+            var resourceSet = ((Message<ResourceSetDTO>)message).Data;
+            this.UpdateResourceSet(client, resourceSet);
         }
 
-        public void UpdateUnits(Client client, Message message)
+        public void UpdateEntities(Client client, Message message)
         {
-            if (client.Disposed) return;
+            if (client.Disposed || client.BattleId == Guid.Empty) return;
 
-            var units = ((Message<ICollection<UnitDTO>>)message).Data;
-            if (!this.server.Users.IsLoggedIn(client.User)
-                || units.Any(u => u.OwnerId != client.User.Id))
-            {
-                this.server.Responses.DataNotSaved(client);
-                return;
-            }
+            var entities = ((Message<ICollection<EntityDTO>>)message).Data;
+            BattleInfo battle;
+            bool gotIt = this.server.Battles.TryGetValue(client.BattleId, out battle);
 
-            var battle = this.server.Battles.GetByUsername(client.User.Username);
-
-            if (battle != null)
+            if (gotIt)
             {
                 battle.LastUpdate = DateTime.Now;
                 this.server.Writer.SendTo(
-                    battle.Attacker.User.Username == client.User.Username
+                    battle.Attacker.Id == client.Id
                     ? battle.Defender : battle.Attacker,
                     message);
             }
 
-            this.UpdateUnits(client.User, units);         
+            foreach (var entity in entities)
+            {
+                if (entity is UnitDTO)
+                {
+                    this.UpdateUnit(client, this.server.Players[client.Id].UnitsMap[entity.Id], (UnitDTO)entity);
+                }
+                else if(entity is ResourceProviderDTO)
+                {
+                    this.UpdateResourceProvider(client, this.server.Players[client.Id].ResProvMap[entity.Id], (ResourceProviderDTO)entity);
+                }
+            }
         }
 
-        public void UpdateResourceProviders(Client client, Message message)
+        public void AddEntity(Client client, Message message)
         {
             if (client.Disposed) return;
 
-            var resourceProviders = ((Message<ICollection<ResourceProviderDTO>>)message).Data;
-            if (!this.server.Users.IsLoggedIn(client.User)
-                || resourceProviders.Any(e => e.Id != client.User.Id))
+            if(!this.server.Players.ContainsKey(client.Id))
             {
-                this.server.Responses.DataNotSaved(client);
+                this.server.Responses.MustBeLoggedIn(client);
                 return;
             }
 
-            this.UpdateResourceProviders(client.User, resourceProviders);
+            var entity = ((Message<EntityDTO>)message).Data;
+            var player = this.server.Players[client.Id];
+            if (entity is UnitDTO)
+            {
+                var unit = (UnitDTO)entity;
+                player.Units.Add(unit);
+                player.UnitsMap.Add(unit.Id, unit);
+            }
+            else if (entity is ResourceProviderDTO)
+            {
+                var resProv = (ResourceProviderDTO)entity;
+                player.ResourceProviders.Add(resProv);
+                player.ResProvMap.Add(resProv.Id, resProv);
+            }
         }
 
-        private void UpdateResourceSet(UserFull user, ResourceSetDTO changedResSet)
+        private void UpdateResourceSet(Client client, ResourceSetDTO changedResSet)
         {
-            if (!this.ValidateForUpdate(user))
-            {
-                return;
-            }
-
-            var player = this.server.Players[user];
+            var player = this.server.Players[client.Id];
 
             // ugly as fuck
             player.ResourceSet.Food.Quantity = changedResSet.Food.Quantity;
@@ -200,77 +215,55 @@
             player.ResourceSet.Population.Quantity = changedResSet.Population.Quantity;
         }
 
-        private void UpdateResourceProviders(UserFull user, ICollection<ResourceProviderDTO> changedResProv)
+        private void UpdateResourceProvider(Client client, ResourceProviderDTO resProv, ResourceProviderDTO changedResProv)
         {
-            if (!this.ValidateForUpdate(user))
+            try
             {
-                return;
+                resProv.Quantity = changedResProv.Quantity;
+                if (resProv.Depleted)
+                {
+                    this.server.Players[client.Id].ResourceProviders.Remove(resProv);
+                    this.server.Players[client.Id].ResProvMap.Remove(resProv.Id);
+                    return;
+                }
+
+                resProv.PosX = changedResProv.PosX;
+                resProv.PosY = changedResProv.PosY;
+                resProv.PosZ = changedResProv.PosZ;
+
+                resProv.RotX = changedResProv.RotX;
+                resProv.RotY = changedResProv.RotY;
+                resProv.RotZ = changedResProv.RotZ;
             }
-
-            var player = this.server.Players[user];
-
-            foreach (var changed in changedResProv)
+            catch
             {
-                var resProv = player.ResourceProviders.First(rp => rp.Id == changed.Id);
-
-                resProv.Quantity = changed.Quantity;
             }
         }
 
-        private void UpdateUnits(UserFull user, ICollection<UnitDTO> changedUnits)
+        private void UpdateUnit(Client client, UnitDTO unit, UnitDTO changedUnit)
         {
-            if (!this.ValidateForUpdate(user))
-            {
-                return;
+            try
+            {              
+                unit.Health = changedUnit.Health;
+
+                if (!unit.IsAlive)
+                {
+                    this.server.Players[client.Id].Units.Remove(unit);
+                    this.server.Players[client.Id].UnitsMap.Remove(unit.Id);
+                    return;
+                }
+
+                unit.PosX = changedUnit.PosX;
+                unit.PosY = changedUnit.PosY;
+                unit.PosZ = changedUnit.PosZ;
+
+                unit.RotX = changedUnit.RotX;
+                unit.RotY = changedUnit.RotY;
+                unit.RotZ = changedUnit.RotZ;
             }
-
-            var player = this.server.Players[user];
-
-            foreach (var changed in changedUnits)
+            catch
             {
-                var unit = player.Units.First(u => u.Id == changed.Id);
-
-                unit.Health = changed.Health;
-                unit.IsAlive = changed.IsAlive;
-
-                unit.PosX = changed.PosX;
-                unit.PosY = changed.PosY;
-                unit.PosZ = changed.PosZ;
-
-                unit.RotX = changed.RotX;
-                unit.RotY = changed.RotY;
-                unit.RotZ = changed.RotZ;
             }
-        }
-
-        private void SwapPlayerData(UserFull user, PlayerDTO detached)
-        {
-            if (!this.ValidateForUpdate(user))
-            {
-                return;
-            }
-
-            var attached = this.server.Players[user];
-
-            PlayerDTO removed;
-            this.server.Context.Entry(attached).State = EntityState.Detached;
-            this.server.Players.TryRemove(user, out removed);
-            this.server.PlayersByUsername.TryRemove(user.Username, out removed);
-
-            this.server.Context.Players.Attach(detached);
-            this.server.Players.TryAdd(user, detached);
-            this.server.PlayersByUsername.TryAdd(user.Username, detached);
-        }
-
-        private bool ValidateForUpdate(UserFull user)
-        {
-            if (this.server.Players.ContainsKey(user))
-            {
-                return true;
-            }
-
-            this.server.Responses.DataNotSaved(this.server.ClientsByUsername[user.Username]);
-            return false;
         }
     }
 }

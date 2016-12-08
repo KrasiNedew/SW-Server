@@ -3,13 +3,13 @@
     using System;
     using System.Net.Sockets;
 
-    using ModelDTOs;
-
     public class Client : IDisposable
     {
         public Socket Socket { get; }
 
-        public UserFull User { get; set; }
+        public Guid Id { get; }
+
+        public Guid BattleId { get; set; }
 
         public bool Disposed { get; private set; }
 
@@ -33,6 +33,8 @@
         public Client(Socket socket)
         {
             this.Socket = socket;
+            this.Id = Guid.NewGuid();
+            this.BattleId = Guid.Empty;
         }
 
         public void Dispose()

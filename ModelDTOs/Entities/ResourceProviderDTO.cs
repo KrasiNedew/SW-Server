@@ -1,6 +1,5 @@
 ﻿namespace ModelDTOs.Entities
 {
-    using System;
     using System.ComponentModel.DataAnnotations.Schema;
 
     using ModelDTOs.Resources;
@@ -11,6 +10,11 @@
     [Table("ResourceProviders")]
     public class ResourceProviderDTO : EntityDTO
     {
+        public enum ProviderType
+        {
+            Tree
+        }
+
         protected ResourceProviderDTO()
         {
         }
@@ -26,9 +30,8 @@
             float rotZ,
             float scale,
             float weight,
-            string type,
             PlayerDTO owner)
-            : base(posX, posY, posZ, rotX, rotY, rotZ, scale, weight, type, owner)
+            : base(posX, posY, posZ, rotX, rotY, rotZ, scale, weight, owner)
         {
             this.Quantity = quantity;
             this.ResourceType = resourceType;
@@ -39,5 +42,10 @@
 
         [ProtoMember(14)]
         public ResourceType ResourceType { get; set; }
+
+        public bool Depleted => this.Quantity > 0;
+
+        [ProtoMember(16)]
+        public ProviderType Type { get; set; }
     }
 }

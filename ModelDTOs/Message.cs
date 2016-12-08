@@ -10,15 +10,13 @@
     [ProtoContract]
     [ProtoInclude(7, typeof(Message<byte>))]
     [ProtoInclude(10, typeof(Message<string>))]
-    [ProtoInclude(20, typeof(Message<UserFull>))]
-    [ProtoInclude(50, typeof(Message<ICollection<UserLimited>>))]
+    [ProtoInclude(50, typeof(Message<string[]>))]
+    [ProtoInclude(20, typeof(Message<AuthDTO>))]
     [ProtoInclude(30, typeof(Message<PlayerDTO>))]
-    [ProtoInclude(40, typeof(Message<ICollection<PlayerDTO>>))]
     [ProtoInclude(60, typeof(Message<ResourceProviderDTO>))]
-    [ProtoInclude(80, typeof(Message<ICollection<ResourceProviderDTO>>))]
     [ProtoInclude(70, typeof(Message<UnitDTO>))]
-    [ProtoInclude(90, typeof(Message<ICollection<UnitDTO>>))]
     [ProtoInclude(100, typeof(Message<ResourceSetDTO>))]
+    [ProtoInclude(90, typeof(Message<ICollection<EntityDTO>>))]
     public abstract class Message
     {
         protected Message()

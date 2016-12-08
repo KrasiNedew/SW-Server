@@ -25,76 +25,53 @@
         {
             if (client.Disposed) return;
 
-            var loginData = ((Message<UserFull>)message).Data;
-            var users = this.server.Users;
+            var loginData = ((Message<AuthDTO>)message).Data;
 
-            bool valid = this.ValidateForLogin(client, users, loginData);
+            if (this.server.Players.ContainsKey(client.Id))
+            {
+                this.server.Responses.AlreadyLoggedIn(client);
+                return;
+            }
 
-            if (!valid) return;
-
-            UserLimited forShare = UserLimited.Create(client.User.Username, true);
-
-            users.MarkLogin(client.User);
-            PlayerDTO player = this.server.Context.Players.Find(client.User.Id);
+            PlayerDTO player = this.server.Context.Players.Include(p => p.Units).Include(p => p.ResourceProviders).FirstOrDefault(p => p.Username == loginData.Username && p.PasswordHash == loginData.PasswordHash && !p.LoggedIn);
 
             if (player == null)
             {
-                users.MarkLogout(client.User);
-                client.User = null;
-                this.server.Responses.InternalError(client);
+                this.server.Responses.InvalidCredentials(client);
                 return;
             }
 
             player.LoggedIn = true;
-            this.server.Players.TryAdd(client.User, player);
-            this.server.ClientsByUsername.TryAdd(client.User.Username, client);
-            this.server.PlayersByUsername.TryAdd(client.User.Username, player);
-            this.server.UsersForShare.TryAdd(forShare, forShare);
+            this.server.Players.TryAdd(client.Id, player);
 
             this.server.Writer.SendTo(client, 
                 Message.Create(Service.PlayerData, player));
             this.server.Responses.LoginSuccess(client);
 
-            Console.WriteLine($"Client {client.User.Username} logged in");
+            Console.WriteLine($"User {loginData.Username} logged in");
         }
 
         public void TryLogout(Client client)
         {
             try
             {
-                var users = this.server.Users;
-
-                if (client.Disposed 
-                    || users.IsValidOnlineUser(client.User) 
-                    || !this.server.Players.ContainsKey(client.User))
+                if (client.Disposed)
                 {
                     return;
                 }
 
-                
-                var player = this.server.Players[client.User];
+                PlayerDTO player;
+                this.server.Players.TryRemove(client.Id, out player);
                 player.LoggedIn = false;       
                 this.server.Context.BulkSaveChanges();
-                this.server.Context.Entry(player).State = EntityState.Detached;;
+                this.server.Context.Entry(player).State = EntityState.Detached;
 
-                users.MarkLogout(client.User);
-                Client removed;
-                PlayerDTO pRemoved;
-                this.server.ClientsByUsername.TryRemove(client.User.Username, out removed);
-                this.server.Players.TryRemove(client.User, out pRemoved);
-                this.server.PlayersByUsername.TryRemove(client.User.Username, out pRemoved);
-
-                UserLimited userRemoved = UserLimited.Create(client.User.Username, client.User.LoggedIn);
-                this.server.UsersForShare.TryRemove(userRemoved, out userRemoved);
-
-                var battle = this.server.Battles.GetByUsername(removed.User.Username);
-                if (battle != null)
+                if (client.BattleId != Guid.Empty)
                 {
-                    this.server.Game.EndBattle(removed);
+                    this.server.Game.EndBattle(client);
                 }
 
-                Console.WriteLine($"Client {client.User.Username} logged out");
-                client.User = null;
+                Console.WriteLine($"User {player.Username} logged out");
             }
             catch
             {
@@ -105,38 +82,24 @@
         {
             if (client.Disposed) return;
 
-            var users = this.server.Users;
-
-            if (!users.IsValidOnlineUser(client.User) || !this.server.Players.ContainsKey(client.User))
+            if (!this.server.Players.ContainsKey(client.Id))
             {
                 this.server.Responses.MustBeLoggedIn(client);
                 return;
             }
 
-
-            var player = this.server.Players[client.User];
+            PlayerDTO player;
+            this.server.Players.TryRemove(client.Id, out player);
             player.LoggedIn = false;
             this.server.Context.BulkSaveChanges();
             this.server.Context.Entry(player).State = EntityState.Detached;
 
-            users.MarkLogout(client.User);
-            Client removed;
-            PlayerDTO pRemoved;
-            this.server.ClientsByUsername.TryRemove(client.User.Username, out removed);
-            this.server.Players.TryRemove(client.User, out pRemoved);
-            this.server.PlayersByUsername.TryRemove(client.User.Username, out pRemoved);
-
-            UserLimited userRemoved = UserLimited.Create(client.User.Username, client.User.LoggedIn);
-            this.server.UsersForShare.TryRemove(userRemoved, out userRemoved);
-
-            var battle = this.server.Battles.GetByUsername(removed.User.Username);
-            if (battle != null)
+            if (client.BattleId != Guid.Empty)
             {
-                this.server.Game.EndBattle(removed);
+                this.server.Game.EndBattle(client);
             }
 
-            Console.WriteLine($"Client {client.User.Username} logged out");
-            client.User = null;
+            Console.WriteLine($"User {player.Username} logged out");
 
             this.server.Responses.LogoutSuccess(client);
         }
@@ -145,17 +108,21 @@
         {
             if (client.Disposed) return;
 
-            var regData = ((Message<UserFull>)message).Data;
-            var users = this.server.Users;
+            if (this.server.Players.ContainsKey(client.Id))
+            {
+                this.server.Responses.AlreadyLoggedIn(client);
+                return;
+            }
 
-            bool valid = this.ValidateForRegister(client, users, regData);
-
-            if (!valid) return;
+            var regData = ((Message<AuthDTO>)message).Data;
+            regData.PasswordHash = Hash.Generate(regData.PasswordHash);
+     
+            if (!this.ValidateForRegister(client, regData)) return;
 
             int worldSeed = Random.Next(0, 1000000000);
 
             PlayerDTO player = 
-            new PlayerDTO(client.User.Username, client.User.PasswordHash, worldSeed)
+            new PlayerDTO(regData.Username, regData.PasswordHash, worldSeed)
             {
                 LoggedIn = true
             };
@@ -163,20 +130,13 @@
             this.server.Context.Players.Add(player);
             this.server.Context.BulkSaveChanges();
 
-            client.User.Id = player.Id;
-            users.MarkRegister(client.User);
-
-            this.server.ClientsByUsername.TryAdd(client.User.Username, client);
-            this.server.Players.TryAdd(client.User, player);
-            this.server.PlayersByUsername.TryAdd(client.User.Username, player);
-            UserLimited forShare = UserLimited.Create(client.User.Username, client.User.LoggedIn);
-            this.server.UsersForShare.TryAdd(forShare, forShare);
+            this.server.Players.TryAdd(client.Id, player);
 
             this.server.Writer.SendTo(client, 
                 Message.Create(Service.PlayerData, player));
             this.server.Responses.RegisterSuccess(client);
 
-            Console.WriteLine($"Client {client.User.Username} registered");
+            Console.WriteLine($"User {regData.Username} registered");
         }
 
         public void LogoutAllUsers()
@@ -198,37 +158,8 @@
             }
         }
 
-        private bool ValidateForLogin(Client client, UsersManager users, UserFull loginData)
+        private bool ValidateForRegister(Client client, AuthDTO regData)
         {
-            if (client.User != null) return false;
-
-            loginData.PasswordHash = Hash.Generate(loginData.PasswordHash);
-            var user = users.GetUser(loginData);
-
-            if (!users.Exists(user) || !users.IsValidOfflineUser(user))
-            {
-                this.server.Responses.InvalidCredentials(client);
-                return false;
-            }
-
-            if (users.IsValidOnlineUser(user))
-            {
-                this.server.Responses.AlreadyLoggedIn(client);
-                return false;
-            }
-
-            client.User = user;
-            return true;
-        }
-
-        private bool ValidateForRegister(Client client, UsersManager users, UserFull regData)
-        {
-            if (client.User != null)
-            {
-                this.server.Responses.AlreadyLoggedIn(client);
-                return false;
-            }
-
             if (string.IsNullOrWhiteSpace(regData.Username))
             {
                 this.server.Responses.UsernameEmpty(client);
@@ -241,28 +172,12 @@
                 return false;
             }
 
-            if (users.GetAll().Any(u => u.Username == regData.Username))
+            if (this.server.Context.Players.Any(p => p.Username == regData.Username))
             {
                 this.server.Responses.UsernameTaken(client);
                 return false;
             }
 
-            regData.PasswordHash = Hash.Generate(regData.PasswordHash);
-            var user = users.GetUser(regData);
-
-            if (users.IsValidOnlineUser(user))
-            {
-                this.server.Responses.AlreadyLoggedIn(client);
-                return false;
-            }
-
-            if (user == null)
-            {
-                this.server.Responses.SomethingWentWrong(client);
-                return false;
-            }
-
-            client.User = user;
             return true;
         }
     }

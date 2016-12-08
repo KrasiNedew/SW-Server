@@ -62,13 +62,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BattlesManager.cs" />
     <Compile Include="Buffers.cs" />
-    <Compile Include="Helpers\ScoreCalculator.cs" />
     <Compile Include="MessageReader.cs" />
     <Compile Include="PrefixReader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="UsersManager.cs" />
     <Compile Include="Wrappers\BattleInfo.cs" />
     <Compile Include="Wrappers\Client.cs" />
   </ItemGroup>

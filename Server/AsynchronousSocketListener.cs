@@ -51,21 +51,13 @@
 
         public readonly byte[] PingByte;
 
-        public readonly UsersManager Users;
-
-        public readonly BattlesManager Battles;
-
-        public readonly ConcurrentDictionary<Client, Client> Clients;
-
-        public readonly ConcurrentDictionary<UserLimited, UserLimited> UsersForShare;
-
         public readonly SimpleWarsContext Context;
 
-        public readonly ConcurrentDictionary<UserFull, PlayerDTO> Players;
+        public readonly ConcurrentDictionary<Guid, PlayerDTO> Players;
 
-        public readonly ConcurrentDictionary<string, PlayerDTO> PlayersByUsername; 
+        public readonly ConcurrentDictionary<Guid, Client> Clients;
 
-        public readonly ConcurrentDictionary<string, Client> ClientsByUsername;
+        public readonly ConcurrentDictionary<Guid, BattleInfo> Battles; 
 
         public readonly ConcurrentDictionary<string, DateTime> BlockedIps;
 
@@ -88,15 +80,9 @@
             this.connectionHandle = new ManualResetEvent(false);
             this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
-            this.Users = new UsersManager();
-            this.Battles = new BattlesManager();
-            this.Clients = new ConcurrentDictionary<Client, Client>();
-            this.ClientsByUsername = new ConcurrentDictionary<string, Client>();
+            this.Clients = new ConcurrentDictionary<Guid, Client>();
             this.BlockedIps = new ConcurrentDictionary<string, DateTime>();
             this.Context = new SimpleWarsContext();
-            this.Players = new ConcurrentDictionary<UserFull, PlayerDTO>();
-            this.PlayersByUsername = new ConcurrentDictionary<string, PlayerDTO>();
-            this.UsersForShare = new ConcurrentDictionary<UserLimited, UserLimited>();
 
             this.Auth = new AuthenticationServices(this);
             this.Game = new GameServices(this);
@@ -161,13 +147,13 @@
                 }
 
 
-                if (this.BlockedIps.Count >= MaxNumberOfConcurrentConnections)
+                if (this.Clients.Count >= MaxNumberOfConcurrentConnections)
                 {
                     this.Responses.ServerFull(client);
                     return;
                 }
 
-                this.Clients.TryAdd(client, client);
+                this.Clients.TryAdd(client.Id, client);
 
                 this.Reader.ReadMessagesContinuously(client);
             }
@@ -202,7 +188,7 @@
                         this.BlockedIps.TryRemove(ip, out timeRemoved);
                     }
 
-                    var badClients = this.Clients.Keys.Where(client => !client.IsConnected(this.PingByte) || client.Disposed || client.ErrorsAccumulated > 10);
+                    var badClients = this.Clients.Values.Where(client => !client.IsConnected(this.PingByte) || client.Disposed || client.ErrorsAccumulated > 10);
 
                     foreach (var badClient in badClients)
                     {
@@ -219,14 +205,14 @@
                         finally
                         {
                             Client removed;
-                            this.Clients.TryRemove(badClient, out removed);
+                            PlayerDTO playerFreed;
+                            this.Clients.TryRemove(badClient.Id, out removed);
+                            this.Players.TryRemove(badClient.Id, out playerFreed);
 
-                            if (this.Users.IsValidCleanUser(badClient.User)
-                                && this.ClientsByUsername
-                                .ContainsKey(badClient.User.Username))
+                            if (removed.BattleId != Guid.Empty 
+                                && this.Battles.ContainsKey(removed.BattleId))
                             {
-                                this.ClientsByUsername
-                                    .TryRemove(badClient.User.Username, out removed);
+                                this.Game.EndBattle(removed);
                             }
                         }
                     }
@@ -251,7 +237,7 @@
                 try
                 {
                     var now = DateTime.Now;
-                    foreach (var battle in this.Battles.GetAll())
+                    foreach (var battle in this.Battles.Values)
                     {
                         if (now.Ticks - battle.LastUpdate.Ticks > MaxUpdateInterval)
                         {
@@ -281,12 +267,9 @@
             {
                 client.Dispose();
                 Client removed;
-                this.Clients.TryRemove(client, out removed);
-
-                if (this.ClientsByUsername.ContainsKey(client.User.Username))
-                {
-                    this.ClientsByUsername.TryRemove(client.User.Username, out removed);
-                }
+                PlayerDTO playerFreed;
+                this.Clients.TryRemove(client.Id, out removed);
+                this.Players.TryRemove(client.Id, out playerFreed);
             }
         }
 
@@ -320,7 +303,6 @@
             return IPAddress.Parse("127.0.0.1");
         }
 
-
         public void Dispose()
         {
             try
@@ -329,7 +311,7 @@
             }
             finally
             {
-                foreach (var client in this.Clients.Keys)
+                foreach (var client in this.Clients.Values)
                 {
                     client.Dispose();
                     this.listener.Close();

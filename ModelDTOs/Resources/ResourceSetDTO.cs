@@ -1,5 +1,6 @@
 ﻿namespace ModelDTOs.Resources
 {
+    using System;
     using System.ComponentModel.DataAnnotations;
     using System.ComponentModel.DataAnnotations.Schema;
 
@@ -22,12 +23,13 @@
             this.Metal = new ResourceDTO(0, ResourceType.Metal);
             this.Population = new ResourceDTO(0, ResourceType.Population);
 
-            this.Player = associatedPlayer;
+            this.Id = associatedPlayer.Id;
+            this.Player = associatedPlayer;            
         }
 
         [ProtoMember(7)]
-        [Key, ForeignKey("Player")]
-        public int Id { get; set; }
+        [Key, DatabaseGenerated(DatabaseGeneratedOption.None), ForeignKey("Player")]
+        public Guid Id { get; set; }
 
         [ProtoMember(1)]
         public virtual ResourceDTO Gold { get; private set; }

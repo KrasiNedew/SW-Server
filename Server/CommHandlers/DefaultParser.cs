@@ -34,17 +34,18 @@
                     this.server.Auth.Register(client, message);
                     break;
 
-                case Service.FullUpdate:
-                    this.server.Game.UpdateFull(client, message);
+                case Service.AddEntity:
+                    this.server.Game.AddEntity(client, message);
                     break;
-                case Service.UpdateUnits:
-                    this.server.Game.UpdateUnits(client, message);
-                    break;
-                case Service.UpdateResourceProviders:
-                    this.server.Game.UpdateResourceProviders(client, message);
+                case Service.UpdateEntities:
+                    this.server.Game.UpdateEntities(client, message);
                     break;
                 case Service.UpdateResourceSet:
                     this.server.Game.UpdateResources(client, message);
+                    break;
+
+                case Service.FetchOtherPlayers:
+                    this.server.Game.SendOtherPlayers(client);
                     break;
 
                 case Service.StartBattle:

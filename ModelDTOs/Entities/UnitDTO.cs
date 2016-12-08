@@ -1,6 +1,5 @@
 ﻿namespace ModelDTOs.Entities
 {
-    using System;
     using System.ComponentModel.DataAnnotations.Schema;
 
     using ProtoBuf;
@@ -9,12 +8,16 @@
     [Table("Units")]
     public class UnitDTO : EntityDTO
     {
+        public enum UnitType
+        {
+            Swordsman
+        }
+
         protected UnitDTO()
         {
         }
 
         public UnitDTO(
-            bool isAlive,
             int health,
             float posX,
             float posY,
@@ -24,19 +27,18 @@
             float rotZ,
             float scale,
             float weight,
-            string type,
             PlayerDTO owner)
-            : base(posX, posY, posZ, rotX, rotY, rotZ, scale, weight, type, owner)
+            : base(posX, posY, posZ, rotX, rotY, rotZ, scale, weight, owner)
         {
-            this.IsAlive = isAlive;
             this.Health = health;
         }
 
-        [ProtoMember(13)]
-        public bool IsAlive { get; set; }
+        public bool IsAlive => this.Health > 0;
 
         [ProtoMember(14)]
         public int Health { get; set; }
 
+        [ProtoMember(15)]
+        public UnitType Type { get; set; }
     }
 }

@@ -30,12 +30,6 @@
             Tuple<byte[], int> data = null;
             try
             {
-                if ((client.User == null || !client.User.LoggedIn || client.User.Id == 0) 
-                    && !(message is Message<string> || message is Message<bool>))
-                {
-                    throw new InvalidOperationException("Cannot send data to non validated clients");
-                }
-
                 data = SerManager.SerializeToManagedBufferPrefixed(message, this.server.Buffers);
 
                 if (client.Disposed)
@@ -92,7 +86,7 @@
             {                                    
                 try
                 {
-                    var clients = this.server.Clients.Keys.Where(c => !c.Disposed
+                    var clients = this.server.Clients.Values.Where(c => !c.Disposed
                     && c.IsConnected(this.server.PingByte) 
                     && c.ErrorsAccumulated <= 10).ToArray();
 
@@ -123,8 +117,6 @@
 
             Task.Run(() =>
             {
-                Message<string> senderUsername = new Message<string>(Service.SenderUsername, sender.User.Username);
-
                 try
                 {
                     switch (message.Service)
@@ -140,7 +132,6 @@
                                 try
                                 {
                                     if(client.Disposed) continue;
-                                    this.server.Writer.SendTo(client, senderUsername);
                                     this.server.Writer.SendTo(client, message);
                                 }
                                 catch (Exception e)
@@ -172,8 +163,7 @@
                     return;
                 }
 
-                int bytesSent = state.Item1.Socket.EndSend(result);
-                Console.WriteLine("Sent {0} bytes to client {1}", bytesSent, state.Item1.User?.Username);
+                state.Item1.Socket.EndSend(result);
                 this.server.Buffers.Return(state.Item2);                
             }
             catch (Exception e)
