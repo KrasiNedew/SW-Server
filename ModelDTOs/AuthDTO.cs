@@ -5,7 +5,10 @@
     [ProtoContract]
     public class AuthDTO
     {
+        [ProtoMember(1)]
         public string Username { get; set; }
+
+        [ProtoMember(2)]
         public string PasswordHash { get; set; }
 
         protected AuthDTO()

@@ -43,7 +43,7 @@
         [ProtoMember(14)]
         public ResourceType ResourceType { get; set; }
 
-        public bool Depleted => this.Quantity > 0;
+        public bool Depleted => this.Quantity <= 0;
 
         [ProtoMember(16)]
         public ProviderType Type { get; set; }

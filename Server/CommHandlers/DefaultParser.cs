@@ -34,8 +34,11 @@
                     this.server.Auth.Register(client, message);
                     break;
 
-                case Service.AddEntity:
-                    this.server.Game.AddEntity(client, message);
+                case Service.AddResProv:
+                    this.server.Game.AddResProv(client, message);
+                    break;
+                case Service.AddUnit:
+                    this.server.Game.AddUnit(client, message);
                     break;
                 case Service.UpdateEntities:
                     this.server.Game.UpdateEntities(client, message);

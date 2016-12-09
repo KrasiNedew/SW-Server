@@ -26,7 +26,7 @@
             if (client.Disposed) return;
 
             var loginData = ((Message<AuthDTO>)message).Data;
-
+            loginData.PasswordHash = Hash.Generate(loginData.PasswordHash);
             if (this.server.Players.ContainsKey(client.Id))
             {
                 this.server.Responses.AlreadyLoggedIn(client);
@@ -47,7 +47,6 @@
 
             this.server.Writer.SendTo(client, 
                 Message.Create(Service.OwnPlayerData, player));
-            this.server.Responses.LoginSuccess(client);
 
             Console.WriteLine($"User {loginData.Username} logged in");
         }
@@ -135,7 +134,6 @@
 
             this.server.Writer.SendTo(client, 
                 Message.Create(Service.OwnPlayerData, player));
-            this.server.Responses.RegisterSuccess(client);
 
             Console.WriteLine($"User {regData.Username} registered");
         }

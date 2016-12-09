@@ -175,7 +175,7 @@
             }
         }
 
-        public void AddEntity(Client client, Message message)
+        public void AddResProv(Client client, Message message)
         {
             if (client.Disposed) return;
 
@@ -185,20 +185,26 @@
                 return;
             }
 
-            var entity = ((Message<EntityDTO>)message).Data;
+            var resProv = ((Message<ResourceProviderDTO>)message).Data;
             var player = this.server.Players[client.Id];
-            if (entity is UnitDTO)
+            player.ResourceProviders.Add(resProv);
+            player.ResProvMap.Add(resProv.Id, resProv);
+        }
+
+        public void AddUnit(Client client, Message message)
+        {
+            if (client.Disposed) return;
+
+            if (!this.server.Players.ContainsKey(client.Id))
             {
-                var unit = (UnitDTO)entity;
-                player.Units.Add(unit);
-                player.UnitsMap.Add(unit.Id, unit);
+                this.server.Responses.MustBeLoggedIn(client);
+                return;
             }
-            else if (entity is ResourceProviderDTO)
-            {
-                var resProv = (ResourceProviderDTO)entity;
-                player.ResourceProviders.Add(resProv);
-                player.ResProvMap.Add(resProv.Id, resProv);
-            }
+
+            var unit = ((Message<UnitDTO>)message).Data;
+            var player = this.server.Players[client.Id];
+            player.Units.Add(unit);
+            player.UnitsMap.Add(unit.Id, unit);
         }
 
         private void UpdateResourceSet(Client client, ResourceSetDTO changedResSet)

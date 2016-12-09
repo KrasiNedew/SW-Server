@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.Linq;
     using System.Net;
     using System.Net.Sockets;
@@ -81,6 +82,8 @@
             this.listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
             this.Clients = new ConcurrentDictionary<Guid, Client>();
+            this.Players = new ConcurrentDictionary<Guid, PlayerDTO>();
+            this.Battles = new ConcurrentDictionary<Guid, BattleInfo>();
             this.BlockedIps = new ConcurrentDictionary<string, DateTime>();
             this.Context = new SimpleWarsContext();
 
@@ -153,6 +156,7 @@
                     return;
                 }
 
+                Console.WriteLine($"Client {client.Id} connected");
                 this.Clients.TryAdd(client.Id, client);
 
                 this.Reader.ReadMessagesContinuously(client);
@@ -167,7 +171,6 @@
             while (true)
             {
                 Thread.Sleep(ConnectionCheckInterval);
-                Console.WriteLine($"Connected clients: {this.Clients.Count}");
 
                 if (this.Clients.Count == 0)
                 {
@@ -281,7 +284,11 @@
 
                 try
                 {
+                    Stopwatch timer = new Stopwatch();
+                    timer.Start();
                     this.Context.BulkSaveChanges();
+                    timer.Stop();
+                    Console.WriteLine("save time: " + timer.ElapsedMilliseconds);
                 }
                 catch
                 {
