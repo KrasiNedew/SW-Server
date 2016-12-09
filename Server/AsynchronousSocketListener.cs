@@ -60,7 +60,7 @@
 
         public readonly ConcurrentDictionary<Guid, BattleInfo> Battles; 
 
-        public readonly ConcurrentDictionary<string, DateTime> BlockedIps;
+        //public readonly ConcurrentDictionary<string, DateTime> BlockedIps;
 
         public readonly AuthenticationServices Auth;
 
@@ -84,7 +84,7 @@
             this.Clients = new ConcurrentDictionary<Guid, Client>();
             this.Players = new ConcurrentDictionary<Guid, PlayerDTO>();
             this.Battles = new ConcurrentDictionary<Guid, BattleInfo>();
-            this.BlockedIps = new ConcurrentDictionary<string, DateTime>();
+            //this.BlockedIps = new ConcurrentDictionary<string, DateTime>();
             this.Context = new SimpleWarsContext();
 
             this.Auth = new AuthenticationServices(this);
@@ -143,11 +143,11 @@
                 Client client = new Client(socket);
 
                 IPEndPoint ip = (IPEndPoint)client.Socket.RemoteEndPoint;
-                if (this.BlockedIps.ContainsKey(ip.Address.ToString()))
-                {
-                    this.Responses.Blocked(client, this.BlockedIps[ip.Address.ToString()]);
-                    return;
-                }
+                //if (this.BlockedIps.ContainsKey(ip.Address.ToString()))
+                //{
+                //    this.Responses.Blocked(client, this.BlockedIps[ip.Address.ToString()]);
+                //    return;
+                //}
 
 
                 if (this.Clients.Count >= MaxNumberOfConcurrentConnections)
@@ -179,17 +179,17 @@
 
                 try
                 {
-                    ICollection<string> unblocked = 
-                        (from ip in this.BlockedIps.Keys
-                        let diff = 
-                        new TimeSpan(DateTime.Now.Ticks - this.BlockedIps[ip].Ticks)
-                        where diff.Minutes > 10 select ip).ToList();
+                    //ICollection<string> unblocked = 
+                    //    (from ip in this.BlockedIps.Keys
+                    //    let diff = 
+                    //    new TimeSpan(DateTime.Now.Ticks - this.BlockedIps[ip].Ticks)
+                    //    where diff.Minutes > 10 select ip).ToList();
 
-                    DateTime timeRemoved;
-                    foreach (var ip in unblocked)
-                    {
-                        this.BlockedIps.TryRemove(ip, out timeRemoved);
-                    }
+                    //DateTime timeRemoved;
+                    //foreach (var ip in unblocked)
+                    //{
+                    //    this.BlockedIps.TryRemove(ip, out timeRemoved);
+                    //}
 
                     var badClients = this.Clients.Values.Where(client => !client.IsConnected(this.PingByte) || client.Disposed || client.ErrorsAccumulated > 10);
 
@@ -198,10 +198,10 @@
                         this.Auth.TryLogout(badClient);
                         try
                         {
-                            if (badClient.ErrorsAccumulated > 10)
-                            {
-                                this.BlockClient(badClient);
-                            }
+                            //if (badClient.ErrorsAccumulated > 10)
+                            //{
+                            //    this.BlockClient(badClient);
+                            //}
 
                             badClient.Dispose();
                         }
@@ -254,27 +254,27 @@
             }
         }
 
-        public void BlockClient(Client client)
-        {
-            try
-            {
-                string ip = ((IPEndPoint)client.Socket.RemoteEndPoint).Address.ToString();
-                if (!this.BlockedIps.ContainsKey(ip))
-                {
-                    this.BlockedIps.TryAdd(ip, DateTime.Now);
-                }
+        //public void BlockClient(Client client)
+        //{
+        //    try
+        //    {
+        //        string ip = ((IPEndPoint)client.Socket.RemoteEndPoint).Address.ToString();
+        //        if (!this.BlockedIps.ContainsKey(ip))
+        //        {
+        //            this.BlockedIps.TryAdd(ip, DateTime.Now);
+        //        }
 
-                this.Responses.Blocked(client, this.BlockedIps[ip]);
-            }
-            finally
-            {
-                client.Dispose();
-                Client removed;
-                PlayerDTO playerFreed;
-                this.Clients.TryRemove(client.Id, out removed);
-                this.Players.TryRemove(client.Id, out playerFreed);
-            }
-        }
+        //        this.Responses.Blocked(client, this.BlockedIps[ip]);
+        //    }
+        //    finally
+        //    {
+        //        client.Dispose();
+        //        Client removed;
+        //        PlayerDTO playerFreed;
+        //        this.Clients.TryRemove(client.Id, out removed);
+        //        this.Players.TryRemove(client.Id, out playerFreed);
+        //    }
+        //}
 
         private void Persist()
         {
