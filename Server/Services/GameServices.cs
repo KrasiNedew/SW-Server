@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Data.Entity;
     using System.Linq;
 
     using ModelDTOs;
@@ -10,6 +11,8 @@
     using ModelDTOs.Resources;
 
     using ServerUtils.Wrappers;
+
+    using Z.EntityFramework.Plus;
 
     public class GameServices
     {
@@ -227,6 +230,7 @@
                 resProv.Quantity = changedResProv.Quantity;
                 if (resProv.Depleted)
                 {
+                    this.server.Context.Entry(resProv).State = EntityState.Deleted;
                     this.server.Players[client.Id].ResourceProviders.Remove(resProv);
                     this.server.Players[client.Id].ResProvMap.Remove(resProv.Id);
                     return;
@@ -253,6 +257,7 @@
 
                 if (!unit.IsAlive)
                 {
+                    this.server.Context.Entry(unit).State = EntityState.Deleted;
                     this.server.Players[client.Id].Units.Remove(unit);
                     this.server.Players[client.Id].UnitsMap.Remove(unit.Id);
                     return;

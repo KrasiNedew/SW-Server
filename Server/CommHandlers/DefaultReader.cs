@@ -20,7 +20,6 @@
             this.server = server;
         }
 
-
         public void ReadSingleMessage(Client client)
         {
             if (client.Disposed) return;

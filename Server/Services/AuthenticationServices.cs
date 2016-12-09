@@ -33,11 +33,17 @@
                 return;
             }
 
-            PlayerDTO player = this.server.Context.Players.Include(p => p.Units).Include(p => p.ResourceProviders).FirstOrDefault(p => p.Username == loginData.Username && p.PasswordHash == loginData.PasswordHash && !p.LoggedIn);
+            PlayerDTO player = this.server.Context.Players.Include(p => p.Units).Include(p => p.ResourceProviders).FirstOrDefault(p => p.Username == loginData.Username && p.PasswordHash == loginData.PasswordHash);
 
             if (player == null)
             {
                 this.server.Responses.InvalidCredentials(client);
+                return;
+            }
+
+            if (player.LoggedIn)
+            {
+                this.server.Responses.PlayerAlreadyLoggedIn(client);
                 return;
             }
 
@@ -62,7 +68,7 @@
 
                 PlayerDTO player;
                 this.server.Players.TryRemove(client.Id, out player);
-                player.LoggedIn = false;       
+                player.LoggedIn = false;   
                 this.server.Context.BulkSaveChanges();
                 this.server.Context.Entry(player).State = EntityState.Detached;
 
@@ -101,7 +107,7 @@
 
             Console.WriteLine($"User {player.Username} logged out");
 
-            //this.server.Responses.LogoutSuccess(client);
+            this.server.Responses.LogoutSuccess(client);
         }
 
         public void Register(Client client, Message message)
