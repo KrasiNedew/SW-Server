@@ -53,6 +53,7 @@
             catch
             {
                 client.ErrorsAccumulated++;
+                client.Dispose();
                 packetAssembler.Dispose();
             }
         }
@@ -96,6 +97,7 @@
                 client.ErrorsAccumulated++;
                 packetAssembler.Dispose();
                 this.server.Responses.SomethingWentWrong(client);
+                client.Dispose();
 
                 Console.WriteLine(e.ToString());
             }
@@ -120,7 +122,7 @@
             {
                 client.ErrorsAccumulated++;
                 prefixReader.Dispose();
-                this.ReadMessagesContinuously(client);
+                client.Dispose();
             }
         }
 
@@ -152,9 +154,9 @@
             catch
             {
                 state.Item1.ErrorsAccumulated++;
+                state.Item1.Dispose();
                 state.Item2.Dispose();
                 Console.WriteLine("Error while reading length prefix");
-                this.ReadMessagesContinuously(state.Item1);
             }
         }
 
@@ -178,8 +180,8 @@
             catch
             {
                 state.Item1.ErrorsAccumulated++;
+                state.Item1.Dispose();
                 state.Item2.Dispose();
-                this.ReadMessagesContinuously(state.Item1);
             }
         }
     }

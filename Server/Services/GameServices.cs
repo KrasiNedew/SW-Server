@@ -147,7 +147,7 @@
 
         public void UpdateEntities(Client client, Message message)
         {
-            if (client.Disposed || client.BattleId == Guid.Empty) return;
+            if (client.Disposed) return;
 
             var entities = ((Message<ICollection<EntityDTO>>)message).Data;
             BattleInfo battle;

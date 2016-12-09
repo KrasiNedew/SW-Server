@@ -101,7 +101,7 @@
 
             Console.WriteLine($"User {player.Username} logged out");
 
-            this.server.Responses.LogoutSuccess(client);
+            //this.server.Responses.LogoutSuccess(client);
         }
 
         public void Register(Client client, Message message)

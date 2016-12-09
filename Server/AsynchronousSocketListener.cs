@@ -142,7 +142,7 @@
 
                 Client client = new Client(socket);
 
-                IPEndPoint ip = (IPEndPoint)client.Socket.RemoteEndPoint;
+                //IPEndPoint ip = (IPEndPoint)client.Socket.RemoteEndPoint;
                 //if (this.BlockedIps.ContainsKey(ip.Address.ToString()))
                 //{
                 //    this.Responses.Blocked(client, this.BlockedIps[ip.Address.ToString()]);
@@ -175,8 +175,8 @@
                 if (this.Clients.Count == 0)
                 {
                     continue;
-                }             
-
+                }
+      
                 try
                 {
                     //ICollection<string> unblocked = 
