@@ -1,9 +1,9 @@
 ﻿namespace ModelDTOs
 {
     using System.Collections.Generic;
-    using ModelDTOs.Entities;
-    using ModelDTOs.Enums;
-    using ModelDTOs.Resources;
+    using Entities;
+    using Enums;
+    using Resources;
 
     using ProtoBuf;
 

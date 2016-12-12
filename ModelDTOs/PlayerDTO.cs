@@ -6,8 +6,8 @@
     using System.ComponentModel.DataAnnotations.Schema;
     using System.Linq;
 
-    using ModelDTOs.Entities;
-    using ModelDTOs.Resources;
+    using Entities;
+    using Resources;
 
     using ProtoBuf;
 
