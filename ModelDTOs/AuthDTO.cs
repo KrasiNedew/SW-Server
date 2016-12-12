@@ -11,14 +11,14 @@
         [ProtoMember(2)]
         public string PasswordHash { get; set; }
 
-        protected AuthDTO()
-        {
-        }
-
         public AuthDTO(string username, string passwordHash)
         {
             this.Username = username;
             this.PasswordHash = passwordHash;
+        }
+
+        protected AuthDTO()
+        {
         }
     }
 }

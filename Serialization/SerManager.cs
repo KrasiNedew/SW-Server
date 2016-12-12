@@ -67,6 +67,17 @@
             }
         }
 
+        
+
+        public static T DeserializeWithLengthPrefix<T>(byte[] data)
+        {
+            using (MemoryStream ms = new MemoryStream(data, 0, FindEnd(data)))
+            {
+                ms.Seek(5, SeekOrigin.Begin);
+                return Serializer.Deserialize<T>(ms);
+            }
+        }
+
         public static int GetLengthPrefix(byte[] data)
         {
             if (data.Length < 5)
@@ -97,15 +108,6 @@
             using (MemoryStream ms = new MemoryStream(prefixBytes.ToArray()))
             {
                 return Serializer.Deserialize<int>(ms);
-            }
-        }
-
-        public static T DeserializeWithLengthPrefix<T>(byte[] data)
-        {
-            using (MemoryStream ms = new MemoryStream(data, 0, FindEnd(data)))
-            {
-                ms.Seek(5, SeekOrigin.Begin);
-                return Serializer.Deserialize<T>(ms);
             }
         }
 
